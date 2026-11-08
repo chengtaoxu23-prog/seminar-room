@@ -1,5 +1,11 @@
 # HANDOFF — SeminarRoom
 
+## 2026-11-08｜当前阶段0正式入口
+
+后续设计与工程依据：[SeminarRoom V1.2 基线](docs/stage0-v1.2/README.md)、[完整工作流](docs/stage0-v1.2/user-workflows.md)、[领域模型](docs/stage0-v1.2/domain-model.md)、[架构与Sidecar退出](docs/stage0-v1.2/technical-architecture.md)、[路线/Backlog](docs/stage0-v1.2/implementation-backlog.md)。阶段0完成后停止，阶段1尚未授权启动。
+
+本次只有设计文档与独立原型，不包含本地未提交生产修复/真实会话/凭据，不更新部署。阶段2同时包含国内优先多模型与持久Agent身份；真实跨模型验收不可无限延期。下文保留早期交接历史；其旧根目录、测试数和实模状态不得覆盖当前发布说明与基线结果。
+
 ## 0. 绝对路径
 
 项目根目录：

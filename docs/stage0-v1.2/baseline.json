@@ -1,0 +1,36 @@
+{
+  "version": "1.2",
+  "date": "2026-11-08",
+  "status": "stage0-formal-design-baseline",
+  "positioning": "AI Research & Collaboration Workspace",
+  "core": "AI团队围绕共同目标开展可观察、可干预、可恢复的工作流；成果为可验收交付物",
+  "stages": [
+    {
+      "id": 0,
+      "scope": "产品定位、架构、设计和工作流蓝图"
+    },
+    {
+      "id": 1,
+      "scope": "真实 Project → Session → Output 工作闭环"
+    },
+    {
+      "id": 2,
+      "scope": "国内优先多模型连接与持久化 Agent 身份"
+    },
+    {
+      "id": 3,
+      "scope": "Router / Worker 自主分工、任务交接和恢复"
+    },
+    {
+      "id": 4,
+      "scope": "共同研究、证据审查和成果写作"
+    },
+    {
+      "id": 5,
+      "scope": "长期记忆、工具生态、事件驱动与自主运行"
+    }
+  ],
+  "prototypeOnly": true,
+  "realModelValidation": "not-run-in-stage0",
+  "sidecarExitGate": "before-first-durable-stage3-run-or-earlier-consistency-trigger"
+}

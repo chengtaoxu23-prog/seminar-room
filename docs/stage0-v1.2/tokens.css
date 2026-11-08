@@ -1,0 +1,14 @@
+/* V1.2 stage 0 · candidate light tokens. Isolated prototype, not production styles. */
+:root{
+ --surface-canvas:#f7f8fc;--surface-base:#fff;--surface-nav:#fcfcff;--surface-soft:#f2f3f8;--surface-accent:#f1edff;
+ --text-primary:#202338;--text-secondary:#586077;--text-muted:#656d81;--text-on-accent:#fff;
+ --border-subtle:#e6e7ef;--border-strong:#cbd0dd;--accent:#6558d3;--accent-hover:#5143bb;--accent-soft:#f1edff;
+ --status-success:#207454;--status-success-bg:#eaf7f0;--status-warning:#8a5915;--status-warning-bg:#fff5e3;--status-error:#aa3d45;--status-error-bg:#fff0f1;--status-info:#376790;--status-info-bg:#edf4fc;
+ --focus:#5143bb;--role-host:#7c65cc;--role-a:#3984b5;--role-b:#c48b43;
+ --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:20px;--space-6:24px;--space-8:32px;
+ --radius-small:6px;--radius-control:8px;--radius-panel:12px;--radius-avatar:14px;
+ --font-ui:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;--text-xs:12px;--text-sm:13px;--text-body:14px;--text-document:15px;--text-title:24px;--line-ui:1.5;--line-document:1.9;
+ --elevation-panel:0 2px 7px #25233c04;--elevation-dialog:0 22px 90px #24203b29;--motion-feedback:120ms;--motion-panel:180ms;
+ --nav-width:216px;--header-height:62px;--control-height:36px;--touch-target:44px;
+}
+@media(prefers-reduced-motion:reduce){:root{--motion-feedback:0ms;--motion-panel:0ms}}

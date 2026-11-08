@@ -1,0 +1,217 @@
+{
+  "version": "1.2",
+  "date": "2026-11-08",
+  "scope": "stage0-documents-and-isolated-prototype",
+  "browser": {
+    "engine": "Microsoft Edge via existing Playwright Core",
+    "passed": 40,
+    "failed": 0,
+    "pageErrors": [],
+    "externalRequests": [],
+    "checks": [
+      {
+        "name": "A: create / material / inline team / planned connection / questions / interjection / pause / resume / summary",
+        "pass": true
+      },
+      {
+        "name": "B: citation → exact paragraph → original message → edit / draft / reload / save / MD + JSON",
+        "pass": true
+      },
+      {
+        "name": "C: assignment / immutable run identity / failure / retry / handoff / approval / once-only artifact update",
+        "pass": true
+      },
+      {
+        "name": "Six regression interaction mappings: preserved pending / successful responder / manual restart / ended / paused error / summary updates",
+        "pass": true
+      },
+      {
+        "name": "Offline: draft retained, no simulated execution, reconnection does not advance",
+        "pass": true
+      },
+      {
+        "name": "Keyboard / modal Escape + focus / native focus containment / command search / menu dismissal / tab arrows",
+        "pass": true
+      },
+      {
+        "name": "Connections: config labels distinct from real identity, mock testing, stable Agent identity",
+        "pass": true
+      },
+      {
+        "name": "Empty / loading / failure / retry states are actionable",
+        "pass": true
+      },
+      {
+        "name": "Multiple interjections: each message retains separate acknowledgements",
+        "pass": true
+      },
+      {
+        "name": "Planning cancellation cannot overwrite a newly opened dialog; confirmed questions persist",
+        "pass": true
+      },
+      {
+        "name": "Ended summary resumes its synthetic completion after refresh",
+        "pass": true
+      },
+      {
+        "name": "Review belongs to a saved version; editing invalidates prior approval",
+        "pass": true
+      },
+      {
+        "name": "Specific failures: summary retry / saved-draft recovery / connection failure identity",
+        "pass": true
+      },
+      {
+        "name": "V1.2 workflow blueprint / dependency gate / stale candidate refuses approval",
+        "pass": true
+      },
+      {
+        "name": "Layout workspace 1440×900",
+        "pass": true
+      },
+      {
+        "name": "Layout project 1440×900",
+        "pass": true
+      },
+      {
+        "name": "Layout team 1440×900",
+        "pass": true
+      },
+      {
+        "name": "Layout room 1440×900",
+        "pass": true
+      },
+      {
+        "name": "Layout output 1440×900",
+        "pass": true
+      },
+      {
+        "name": "Layout connections 1440×900",
+        "pass": true
+      },
+      {
+        "name": "Layout materials 1440×900",
+        "pass": true
+      },
+      {
+        "name": "Layout tasks 1440×900",
+        "pass": true
+      },
+      {
+        "name": "Layout workspace 1024×768",
+        "pass": true
+      },
+      {
+        "name": "Layout project 1024×768",
+        "pass": true
+      },
+      {
+        "name": "Layout team 1024×768",
+        "pass": true
+      },
+      {
+        "name": "Layout room 1024×768",
+        "pass": true
+      },
+      {
+        "name": "Layout output 1024×768",
+        "pass": true
+      },
+      {
+        "name": "Layout connections 1024×768",
+        "pass": true
+      },
+      {
+        "name": "Layout materials 1024×768",
+        "pass": true
+      },
+      {
+        "name": "Layout tasks 1024×768",
+        "pass": true
+      },
+      {
+        "name": "Layout workspace 390×844",
+        "pass": true
+      },
+      {
+        "name": "Layout project 390×844",
+        "pass": true
+      },
+      {
+        "name": "Layout team 390×844",
+        "pass": true
+      },
+      {
+        "name": "Layout room 390×844",
+        "pass": true
+      },
+      {
+        "name": "Layout output 390×844",
+        "pass": true
+      },
+      {
+        "name": "Layout connections 390×844",
+        "pass": true
+      },
+      {
+        "name": "Layout materials 390×844",
+        "pass": true
+      },
+      {
+        "name": "Layout tasks 390×844",
+        "pass": true
+      },
+      {
+        "name": "Mobile navigation + keyboard + composer controls reachable",
+        "pass": true
+      },
+      {
+        "name": "V1.2 narrow candidate review stays readable and applies the reviewed text",
+        "pass": true
+      }
+    ]
+  },
+  "viewports": [
+    [
+      1440,
+      900
+    ],
+    [
+      1024,
+      768
+    ],
+    [
+      390,
+      844
+    ]
+  ],
+  "semanticContrastPairs": 9,
+  "publishedAlpha": {
+    "sourceCommit": "d5ad8d405191b694bc56835e05f4e1fe27c30a99",
+    "unitCount": 8,
+    "typecheck": "passed",
+    "unit": "passed",
+    "build": "passed",
+    "mockE2E": "passed",
+    "visual": "passed",
+    "mockCallRows": 13
+  },
+  "newerLocalAlpha": {
+    "sourceCommit": "8a48fd99ee91fd69638968ab95cd4bc834b3f236",
+    "hasPreExistingUncommittedFixes": true,
+    "unitCount": 34,
+    "typecheck": "passed",
+    "unit": "passed",
+    "build": "passed",
+    "mockE2E": "passed",
+    "visual": "passed",
+    "mockCallRows": 15,
+    "notIncludedInThisCommit": true
+  },
+  "realModels": "not invoked",
+  "notes": [
+    "Unit counts may include nested parent/child tests.",
+    "Public Alpha and local uncommitted Alpha were tested separately; passing local tests is not public synchronization.",
+    "No production files or dependencies changed."
+  ]
+}
