@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { DiscussionQuestion, MaterialSegment } from '../../src/shared/types';
+import type { DiscussionQuestion, MaterialSegment, SeminarMessage } from '../../src/shared/types';
 import { QuoteIcon } from './Common';
 
 export interface ActiveCitation {
@@ -12,10 +12,14 @@ export function MaterialPanel({
   segments,
   questions,
   activeCitation,
+  messages = [],
+  onMessage,
 }: {
   segments: MaterialSegment[];
   questions: DiscussionQuestion[];
   activeCitation: ActiveCitation | null;
+  messages?: SeminarMessage[];
+  onMessage?: (id: string) => void;
 }) {
   const refs = useRef(new Map<number, HTMLElement>());
   const [flashId, setFlashId] = useState<number | null>(null);
@@ -74,6 +78,7 @@ export function MaterialPanel({
                 ? highlight(segment.text, activeCitation.quote)
                 : segment.text}
             </p>
+            {messages.filter(message => message.blocks.some(block => block.citations.some(citation => citation.paragraphId === segment.id))).map(message => <button className="related-discussion" key={message.id} onClick={() => onMessage?.(message.id)}><span>相关讨论 · {message.actorName}</span><span>{message.blocks.find(block => block.citations.some(citation => citation.paragraphId === segment.id))?.text}</span></button>)}
           </article>
         ))}
       </div>

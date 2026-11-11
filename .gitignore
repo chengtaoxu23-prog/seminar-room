@@ -13,3 +13,15 @@ data/
 *.log
 .DS_Store
 Thumbs.db
+
+# GTM release exclusions (preserve local artifacts)
+.env*
+!.env.example
+work/
+outputs/
+*.tmp
+*.bak
+*.zip
+*.patch
+coverage/
+.cache/

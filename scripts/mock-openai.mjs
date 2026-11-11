@@ -58,7 +58,7 @@ function host(messages) {
   if (pending.length) {
     return JSON.stringify({
       action: 'invite',
-      participantId: 'a',
+      participantId: prompt.includes('待回应角色=b；') ? 'b' : 'a',
       publicMessage: '用户刚刚提出 23:00 的折中。周证，请你直接回答成本问题，并回应陈疑对统计口径的质疑。',
       prompt: '直接回应用户的 23:00 折中，引用材料里的值班成本，并回应陈疑的质疑。',
       focus: '直接回应用户：23:00 折中',

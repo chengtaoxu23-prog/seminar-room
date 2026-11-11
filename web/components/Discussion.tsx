@@ -1,3 +1,4 @@
+import { ModelIdentity } from './WorkspaceUI';
 import type { RefObject } from 'react';
 import type {
   Activity,
@@ -23,6 +24,7 @@ export function Discussion({
   scrollRef,
   onCite,
   replay = false,
+  model,
 }: {
   messages: SeminarMessage[];
   roles: Record<RoleKey, RoleConfig>;
@@ -31,6 +33,7 @@ export function Discussion({
   scrollRef?: RefObject<HTMLDivElement | null>;
   onCite: (citation: ActiveCitation) => void;
   replay?: boolean;
+  model?: string;
 }) {
   const byId = new Map(messages.map((message) => [message.id, message]));
 
@@ -68,6 +71,7 @@ export function Discussion({
             return (
               <article
                 key={message.id}
+                id={`message-${message.id}`}
                 className={`message host-message ${isEnd ? 'host-end' : ''}`}
               >
                 <div className="host-rail" aria-hidden="true" />
@@ -75,7 +79,7 @@ export function Discussion({
                   <div className="message-head">
                     <span className="host-badge">主持人</span>
                     <strong>{message.actorName}</strong>
-                    <span className="message-time">{clockLabel(message.createdAt)}</span>
+                    <span className="message-time">{clockLabel(message.createdAt)}</span>{model && <ModelIdentity model={model} />}
                     {message.hostAction && (
                       <span className={`action-chip action-${message.hostAction.action}`}>
                         {actionLabels[message.hostAction.action] ?? message.hostAction.action}
@@ -104,7 +108,7 @@ export function Discussion({
 
           if (message.role === 'user') {
             return (
-              <article key={message.id} className="message user-message">
+              <article key={message.id} id={`message-${message.id}`} className="message user-message">
                 <div className="user-bubble">
                   <div className="message-head user-head">
                     <span>你</span>
@@ -121,6 +125,7 @@ export function Discussion({
           return (
             <article
               key={message.id}
+                id={`message-${message.id}`}
               className={`message participant-message participant-${message.actorId}`}
             >
               <div className="avatar" aria-hidden="true">
@@ -132,7 +137,7 @@ export function Discussion({
                   <span className="seat-label">
                     {roles[message.actorId as RoleKey]?.seat ?? '参与者'}
                   </span>
-                  <span className="message-time">{clockLabel(message.createdAt)}</span>
+                  <span className="message-time">{clockLabel(message.createdAt)}</span>{model && <ModelIdentity model={model} />}
                   {participant?.directToUser && <span className="direct-badge">直接回应你</span>}
                 </div>
                 {addressed && <div className="address-row">回应：{addressed}</div>}
@@ -140,7 +145,7 @@ export function Discussion({
                   {message.blocks.map((block, index) => (
                     <div key={`${message.id}-${index}`} className={`block block-${block.type}`}>
                       <span className="block-label">{blockLabels[block.type] ?? block.type}</span>
-                      <p>{block.text}</p>
+                      <StructuredText text={block.text} />
                       {block.citations.length > 0 && (
                         <div className="citation-row">
                           {block.citations.map((citation, citationIndex) => (
@@ -197,7 +202,7 @@ export function Discussion({
           <div className={`thinking-row thinking-${activity.actorId ?? 'system'}`}>
             <Spinner size={14} />
             <span>{activity.label}</span>
-            <span className="thinking-note">真实模型调用中</span>
+            <span className="thinking-note">正在等待成员响应</span>
           </div>
         )}
 
@@ -207,4 +212,23 @@ export function Discussion({
       </div>
     </section>
   );
+}
+
+// A small, safe renderer for model-authored blocks. Never interprets HTML.
+export function StructuredText({ text }: { text: string }) {
+  const parts = text.split(/(```[\s\S]*?```)/g);
+  return <div className="structured-text">{parts.map((part, index) => {
+    if (part.startsWith('```')) {
+      const lines = part.slice(3, -3).split('\n');
+      const language = lines.shift();
+      return <pre key={index}><code data-language={language}>{lines.join('\n')}</code></pre>;
+    }
+    return part.split(/\n\s*\n/).map((paragraph, i) => {
+      const lines = paragraph.split('\n');
+      if (lines.every(line => /^\s*[-*]\s/.test(line))) return <ul key={`${index}-${i}`}>{lines.map((line,j)=><li key={j}>{line.replace(/^\s*[-*]\s/,'')}</li>)}</ul>;
+      if (lines.every(line => /^\s*\d+[.)]\s/.test(line))) return <ol key={`${index}-${i}`}>{lines.map((line,j)=><li key={j}>{line.replace(/^\s*\d+[.)]\s/,'')}</li>)}</ol>;
+      if (lines.every(line => /^>\s?/.test(line))) return <blockquote key={`${index}-${i}`}>{lines.map(line=>line.replace(/^>\s?/, '')).join('\n')}</blockquote>;
+      return paragraph.trim() ? <p key={`${index}-${i}`}>{paragraph}</p> : null;
+    });
+  })}</div>;
 }

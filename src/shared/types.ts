@@ -245,6 +245,13 @@ export interface SeminarSession {
   calls: CallLog[];
   decisions: DecisionRecord[];
   pendingUserMessageIds: string[];
+  /** Persist acknowledgements separately so retries never repeat successful responders. */
+  userResponses?: Record<string, {
+    required: ('a' | 'b')[];
+    completed: ('a' | 'b')[];
+    failedActor?: 'a' | 'b';
+    error?: string;
+  }>;
   summary: SeminarSummary;
   activity: Activity;
   lastError: SessionError | null;

@@ -1,3 +1,4 @@
+import { ModelIdentity } from './WorkspaceUI';
 import { useEffect, useState } from 'react';
 import type { HealthResponse, SeminarSession } from '../../src/shared/types';
 import { ArrowIcon, Spinner, StageBadge, clockLabel } from './Common';
@@ -212,7 +213,7 @@ export function Setup({
               <div>
                 <dt>模型</dt>
                 <dd>
-                  {session.provider.model} @ {session.provider.baseUrlHost}
+                  <ModelIdentity model={session.provider.model} /> @ {session.provider.baseUrlHost}
                 </dd>
               </div>
               <div>

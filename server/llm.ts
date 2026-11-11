@@ -1,4 +1,5 @@
 import { config } from './config.js';
+import { providerOptions } from './provider.js';
 import type { TokenUsage } from '../src/shared/types.js';
 
 export interface LlmMessage {
@@ -107,6 +108,7 @@ export async function chatCompletion(
   messages: LlmMessage[],
   options: {
     tools?: LlmToolDefinition[];
+    toolChoice?: 'auto' | 'required';
     maxTokens?: number;
     signal?: AbortSignal;
     timeoutMs?: number;
@@ -135,10 +137,11 @@ export async function chatCompletion(
     temperature: options.temperature ?? config.temperature,
     max_tokens: options.maxTokens ?? config.limits.maxOutputTokens,
     stream: false,
+    ...providerOptions(config.baseUrl, config.model),
   };
   if (options.tools?.length) {
     body.tools = options.tools;
-    body.tool_choice = 'auto';
+    body.tool_choice = options.toolChoice ?? 'auto';
   }
 
   try {

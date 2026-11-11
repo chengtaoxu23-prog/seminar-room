@@ -1,0 +1,82 @@
+import {createRequire} from 'node:module';
+import {fileURLToPath} from 'node:url';
+import path from 'node:path';
+import {mkdir,writeFile} from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const require=createRequire(root+'/package.json');
+const {chromium}=require('playwright-core');
+const out=process.env.SEMINAR_TEST_OUTPUT_DIR ?? path.join(root,'docs/screenshots/ui-review'); await mkdir(out,{recursive:true});
+const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
+const base=process.env.SEMINAR_UI_URL ?? 'http://127.0.0.1:4338';
+assert.ok(['localhost','127.0.0.1'].includes(new URL(base).hostname));
+const health=await (await fetch(base+'/api/health')).json();
+assert.equal(health.model,'e2e-mock-not-a-real-model','This check requires the isolated Mock server');
+assert.equal(health.baseUrlHost,'127.0.0.1:4320');
+const page=await browser.newPage({viewport:{width:1440,height:900}});
+const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+try {
+ await page.goto(base);await page.waitForSelector('.test-materials');assert.ok(!(await page.locator('body').innerText()).includes('e2e-mock-not-a-real-model'));await page.screenshot({animations:'disabled',path:out+'/home-1440.png'});
+ await page.getByRole('button',{name:'载入材料'}).first().click();await page.screenshot({animations:'disabled',path:out+'/create-1440.png'});await page.getByRole('button',{name:/生成三个问题/}).click();
+ await page.waitForFunction(()=>document.querySelectorAll('.question-field textarea').length===3);
+ await page.screenshot({animations:'disabled',path:out+'/setup-1440.png'});
+ await page.getByRole('button',{name:/开始研讨/}).click();await page.waitForSelector('.participant-message');
+ await page.getByRole('button',{name:'暂停',exact:true}).click();await page.waitForTimeout(1800);
+ await page.locator('.composer-wrap textarea').fill('如果只在周五延长到23点，成本能不能降下来？');await page.getByRole('button',{name:'发言',exact:true}).click();
+ await page.waitForSelector('.pending-chip');
+ await page.screenshot({animations:'disabled',path:out+'/room-1440.png'});await page.locator('.team-panel').screenshot({animations:'disabled',path:out+'/team-1440.png'});
+ const sessionUrl=page.url();
+ const pausedSnapshot=(await (await page.request.get(base+'/api/sessions/'+new URL(sessionUrl).searchParams.get('session'))).json()).session;
+ await page.getByRole('button',{name:'继续',exact:true}).click();await page.waitForSelector('.stage-ended',{timeout:40000});await page.getByRole('tab',{name:'成果总结'}).click();await page.getByRole('button',{name:'编辑成果',exact:true}).click();await page.waitForSelector('.evidence-edit',{timeout:15000});
+ await page.getByRole('button',{name:'查看成果 ↗'}).click();await page.locator('.summary-item-edit textarea').first().fill('人工核对：先做六周试行，保留成本和开放时间的分歧。');
+ await page.getByRole('tab',{name:/材料/}).click();await page.getByRole('tab',{name:'成果总结'}).click();
+ assert.equal(await page.locator('.summary-item-edit textarea').first().inputValue(),'人工核对：先做六周试行，保留成本和开放时间的分歧。','unsaved edits survive resource tabs');
+ await page.getByRole('button',{name:'阅读成果',exact:true}).click();assert.match(await page.locator('.summary-reading').innerText(),/人工核对/);
+ await page.getByRole('button',{name:'编辑成果',exact:true}).click();
+ await page.getByRole('button',{name:'保存编辑'}).click();await page.waitForFunction(()=>document.body.innerText.includes('已人工编辑'));
+ await page.screenshot({animations:'disabled',path:out+'/summary-1440.png'});
+ await page.locator('.summary-panel .citation:visible').first().click(); await page.waitForSelector('.material-segment mark');assert.equal(await page.getByRole('tab',{name:/材料/}).getAttribute('aria-selected'),'true');
+ await page.screenshot({animations:'disabled',path:out+'/citation-1440.png'});
+ await page.locator('.related-discussion').first().click();assert.equal(await page.locator('.center-column').isVisible(),true);
+ await page.getByRole('button',{name:'查看成果 ↗'}).click();await page.getByRole('button',{name:'阅读成果',exact:true}).click();
+ await page.locator('.output-directory button').last().click();await page.waitForTimeout(300);assert.ok(await page.locator('.summary-reading').evaluate(node=>node.scrollTop)>0);
+ await page.getByRole('button',{name:'返回讨论布局'}).click();await page.getByRole('tab',{name:'成果总结'}).click();
+ const results=[];
+ for(const [w,h] of [[1440,900],[1024,768],[390,844]]) {
+   await page.setViewportSize({width:w,height:h});await page.goto(base);await page.waitForSelector('.test-materials');
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),w,`home overflow ${w}`);
+   await page.screenshot({animations:'disabled',path:out+`/home-${w}.png`,fullPage:true});
+   await page.getByRole('button',{name:'载入材料'}).first().click();await page.screenshot({animations:'disabled',path:out+`/create-${w}.png`,fullPage:true});await page.getByRole('button',{name:'研究概览',exact:true}).click();
+   await page.getByRole('button',{name:'继续这个研讨'}).click();await page.waitForSelector('.room-shell');
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),w,`room overflow ${w}`);
+   assert.equal(await page.locator('.agent-card').count(),3); if(w>760) assert.equal(await page.locator('.collaboration-grid').evaluate(node=>getComputedStyle(node).gridTemplateRows.split(' ').length),1,'desktop and tablet use one full-height workspace row');
+   assert.equal(await page.getByRole('button',{name:/技术记录/}).isVisible(),true);
+   await page.screenshot({animations:'disabled',path:out+`/completed-room-${w}.png`,fullPage:w===390});
+   await page.getByRole('button',{name:'查看成果 ↗'}).click();
+   await page.screenshot({animations:'disabled',path:out+`/summary-${w}.png`,fullPage:w===390});
+   await page.getByRole('button',{name:'返回讨论布局'}).click();
+   results.push({width:w,height:h,homeOverflow:false,roomOverflow:false,teamMembers:3,historyReopened:true});
+ }
+ // Browser-only response fixtures: never write historical data or call a model.
+ const id=new URL(sessionUrl).searchParams.get('session');const snapshot=(await (await page.request.get(`${base}/api/sessions/${id}`)).json()).session;
+ await page.setViewportSize({width:1440,height:900});
+ const fixture=structuredClone(pausedSnapshot); fixture.stage='paused';fixture.stopReason='interrupted';fixture.activity={phase:'idle',actorId:null,label:'',startedAt:null};fixture.lastError={code:'session_interrupted',message:'测试中断',retryable:true,at:new Date().toISOString()};
+ await page.route(`**/api/sessions/${id}`,r=>r.fulfill({json:{session:fixture}}));
+ await page.goto(sessionUrl);await page.waitForSelector('.banner-info');assert.match(await page.locator('.room-shell').innerText(),/点击“继续”后才会恢复执行/);await page.screenshot({animations:'disabled',path:out+'/state-interrupted.png'});
+ fixture.stopReason='user_pause';fixture.lastError={code:'user_response_failed',message:'参与者 B 回应失败，A 已完成。',retryable:true,at:new Date().toISOString()};fixture.pendingUserMessageIds=['fixture-user'];fixture.userResponses={'fixture-user':{required:['a','b'],completed:['a'],failedActor:'b'}};
+ await page.reload();await page.waitForSelector('.banner-error');assert.match(await page.locator('.banner-error').innerText(),/消息已保留/);assert.match(await page.locator('.pending-chip').innerText(),/1 条插话待回应/);assert.match(await page.locator('.response-progress').innerText(),/已回应.*回应失败，待重试/);await page.screenshot({animations:'disabled',path:out+'/state-paused-failure.png'});
+ fixture.stage='ended';fixture.stopReason='host_end';fixture.lastError=null;
+ await page.reload();await page.waitForSelector('.stage-ended');assert.equal(await page.getByRole('button',{name:'继续',exact:true}).count(),0);assert.match(await page.locator('.pending-chip').innerText(),/未完成回应/);
+ fixture.stage='draft';fixture.stopReason=null;fixture.pendingUserMessageIds=[];
+ for(const [w,h] of [[1440,900],[1024,768],[390,844]]) {
+   await page.setViewportSize({width:w,height:h});await page.reload();await page.waitForSelector('.setup-shell');
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),w,`setup overflow ${w}`);
+   await page.screenshot({animations:'disabled',path:out+`/setup-${w}.png`,fullPage:w===390});
+ }
+ await page.unrouteAll();await page.setViewportSize({width:1440,height:900});await page.goto(base);await page.waitForSelector('.test-materials');
+ await page.getByRole('button',{name:'载入材料'}).first().click();await page.getByRole('button',{name:/生成三个问题/}).click();
+ await page.waitForFunction(()=>document.querySelectorAll('.question-field textarea').length===3);await page.getByRole('button',{name:/开始研讨/}).click();await page.waitForSelector('.room-shell');
+ await page.getByRole('button',{name:'结束',exact:true}).click();await page.waitForSelector('.stage-ended');await page.getByRole('tab',{name:'成果总结'}).click();await page.waitForSelector('.summary-panel .editable-chip',{timeout:15000});
+ assert.deepEqual(errors,[]);await writeFile(out+'/ui-check-results.json',JSON.stringify({results,stateFixtures:['interrupted','paused-failure-partial-success','host-ended'],citationLocated:true,relatedDiscussionLocated:true,unsavedDraftPreserved:true,readingAndEditing:true,outputDirectoryScrolled:true,summarySaved:true,manualEnd:true,errors},null,2));
+ console.log('PASS workspace browser QA',JSON.stringify(results));
+}finally {await browser.close();}

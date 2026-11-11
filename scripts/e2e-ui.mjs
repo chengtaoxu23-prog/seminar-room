@@ -1,5 +1,10 @@
 ﻿import { chromium } from 'playwright-core';
 import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
+import path from 'node:path';
+
+const screenshotDir = process.env.SEMINAR_TEST_OUTPUT_DIR ?? 'docs/screenshots';
+await mkdir(screenshotDir, { recursive: true });
 
 const edge = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const browser = await chromium.launch({ executablePath: edge, headless: true });
@@ -12,8 +17,12 @@ page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
 page.on('dialog', (dialog) => void dialog.accept());
 
 try {
+  const health = await (await page.request.get('http://127.0.0.1:4318/api/health')).json();
+  assert.equal(health.model, 'e2e-mock-not-a-real-model');
+  assert.equal(health.baseUrlHost, '127.0.0.1:4320', 'E2E must use the local stub');
   await page.goto('http://127.0.0.1:4318/', { waitUntil: 'networkidle' });
-  assert.match(await page.locator('.model-status').innerText(), /e2e-mock-not-a-real-model/);
+  assert.match(await page.locator('.model-status').innerText(), /本地测试连接/);
+  assert.ok(!(await page.locator('body').innerText()).includes('e2e-mock-not-a-real-model'));
   await page.getByRole('button', { name: '载入材料' }).first().click();
   await page.getByRole('button', { name: /生成三个问题/ }).click();
 
@@ -29,7 +38,7 @@ try {
   const firstQuestion = await questionInputs.nth(0).inputValue();
   assert.ok(firstQuestion.length > 5);
   await questionInputs.nth(0).fill(`${firstQuestion}（先核对数据）`);
-  await page.screenshot({ path: 'docs/screenshots/setup-e2e-mock.png', fullPage: false });
+  await page.screenshot({ path: path.join(screenshotDir, 'setup-e2e-mock.png'), fullPage: false });
 
   await page.getByRole('button', { name: /开始研讨/ }).click();
   await page.waitForSelector('.room-shell');
@@ -40,7 +49,7 @@ try {
     { timeout: 20000 },
   );
   await page.waitForTimeout(600);
-  await page.screenshot({ path: 'docs/screenshots/room-e2e-mock.png' });
+  await page.screenshot({ path: path.join(screenshotDir, 'room-e2e-mock.png') });
 
   await page.getByRole('button', { name: '暂停', exact: true }).click();
   await page.waitForSelector('.stage-paused');
@@ -57,9 +66,11 @@ try {
   await page.waitForSelector('.direct-badge', { timeout: 20000 });
   await page.locator('.user-message').scrollIntoViewIfNeeded();
   await page.waitForTimeout(300);
-  await page.screenshot({ path: 'docs/screenshots/room-user-interjection-e2e-mock.png' });
+  await page.screenshot({ path: path.join(screenshotDir, 'room-user-interjection-e2e-mock.png') });
 
   await page.waitForSelector('.stage-ended', { timeout: 25000 });
+  await page.getByRole('tab', {name: '成果总结'}).click();
+  await page.getByRole('button', {name: '编辑成果', exact: true}).click();
   await page.waitForFunction(
     () => document.body.innerText.includes('可编辑') && document.querySelectorAll('.evidence-edit').length > 0,
     null,
@@ -73,7 +84,7 @@ try {
     null,
     { timeout: 10000 },
   );
-  await page.screenshot({ path: 'docs/screenshots/room-summary-e2e-mock.png' });
+  await page.screenshot({ path: path.join(screenshotDir, 'room-summary-e2e-mock.png') });
 
   await page.getByRole('button', { name: /技术记录/ }).click();
   await page.waitForSelector('.tech-drawer');
@@ -84,7 +95,7 @@ try {
   assert.match(techText, /主持人/);
   assert.match(techText, /参与者/);
   assert.match(techText, /总结/);
-  await page.screenshot({ path: 'docs/screenshots/tech-trace-e2e-mock.png' });
+  await page.screenshot({ path: path.join(screenshotDir, 'tech-trace-e2e-mock.png') });
 
   const sessionId = new URL(page.url()).searchParams.get('session');
   assert.ok(sessionId);
@@ -101,6 +112,8 @@ try {
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForSelector('.room-shell');
   await page.waitForTimeout(1200);
+  await page.getByRole('tab', {name: '成果总结'}).click();
+  await page.getByRole('button', {name: '编辑成果', exact: true}).click();
   assert.equal(
     await page.locator('.summary-item-edit textarea').first().inputValue(),
     '已编辑：双方接受先做六周试行，但不能把 23:00 写成长期规则。',
@@ -109,9 +122,10 @@ try {
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await mobile.goto(`http://127.0.0.1:4318/?session=${sessionId}`, { waitUntil: 'networkidle' });
   await mobile.waitForSelector('.room-shell');
-  await mobile.screenshot({ path: 'docs/screenshots/room-mobile.png' });
+  await mobile.screenshot({ path: path.join(screenshotDir, 'room-mobile.png') });
   assert.equal(await mobile.evaluate(() => document.body.scrollWidth), 390);
 
+  assert.deepEqual(errors, [], 'browser console and page errors must fail E2E');
   console.log(
     JSON.stringify(
       {

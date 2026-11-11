@@ -170,6 +170,8 @@ function isEnded(session: SeminarSession): boolean {
   return session.stage === 'ended';
 }
 
+const backgroundByDirectory = new Map<string, Set<Promise<void>>>();
+
 export class SeminarEngine {
   private readonly cache = new Map<string, SeminarSession>();
   private readonly runtimes = new Map<string, Runtime>();
@@ -181,14 +183,54 @@ export class SeminarEngine {
     private readonly llm: LlmFunction = chatCompletion,
   ) {}
 
+  private trackBackground(task: Promise<unknown>): void {
+    const key = this.store.directory;
+    const tasks = backgroundByDirectory.get(key) ?? new Set<Promise<void>>();
+    backgroundByDirectory.set(key, tasks);
+    const tracked = task.then(() => undefined, () => undefined);
+    tasks.add(tracked);
+    void tracked.finally(() => {
+      tasks.delete(tracked);
+      if (!tasks.size && backgroundByDirectory.get(key) === tasks) backgroundByDirectory.delete(key);
+    });
+  }
+
+  /** Observation/drain only: does not start, stop, retry or change any session. */
+  async waitForIdle(timeoutMs = 5000): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const drain = async () => {
+      while (true) {
+        const tasks = [...(backgroundByDirectory.get(this.store.directory) ?? [])];
+        if (tasks.length) await Promise.all(tasks);
+        await this.store.flush();
+        if (!(backgroundByDirectory.get(this.store.directory)?.size)) return;
+      }
+    };
+    try {
+      await Promise.race([drain(), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Session background work did not settle.')), timeoutMs); })]);
+    } finally { if (timer) clearTimeout(timer); }
+  }
+
   async init(): Promise<void> {
     await this.store.init();
+    for (const id of await this.store.ids()) {
+      try { await this.getSession(id); }
+      catch { console.error(`[seminar-room] 无法恢复会话 ${id}，原文件保留。`); }
+    }
   }
 
   private async getSession(id: string): Promise<SeminarSession> {
     const cached = this.cache.get(id);
     if (cached) return cached;
     const session = await this.store.get(id);
+    // Loading a persisted running session never starts a worker or spends API credits.
+    if (session.stage === 'running') {
+      session.stage = 'paused';
+      session.stopReason = 'interrupted';
+      session.activity = { phase: 'idle', actorId: null, label: '', startedAt: null };
+      session.lastError = { code: 'session_interrupted', message: '服务曾中断。已完成的发言已保留，点击继续后才会恢复调用。', at: nowIso(), retryable: true };
+      await this.persist(session);
+    }
     this.cache.set(id, session);
     return session;
   }
@@ -610,6 +652,7 @@ export class SeminarEngine {
     this.ensureConfigured();
     session.stage = 'running';
     session.lastError = null;
+    session.stopReason = null;
     await this.persist(session);
     this.kick(session.id);
     return session;
@@ -624,7 +667,7 @@ export class SeminarEngine {
       session.stage = 'ended';
       session.stopReason = 'user_end';
       session.activity = { phase: 'idle', actorId: null, label: '', startedAt: null };
-      session.pendingUserMessageIds = [];
+      // Explicitly stopping does not turn unanswered messages into successful responses.
       await this.persist(session);
       this.abortRuntime(session.id);
       this.triggerSummary(session.id);
@@ -640,10 +683,10 @@ export class SeminarEngine {
     if (!['running', 'paused'].includes(session.stage)) {
       throw new AppError(409, 'not_accepting_messages', '当前状态不接受插话。');
     }
-    if (session.round >= session.limits.maxRounds) {
-      throw new AppError(409, 'round_limit', '已达到轮次上限，不再接受新的插话。');
+    if (session.limits.maxRounds - session.round < 2) {
+      throw new AppError(409, 'round_limit', '剩余轮次不足以安排两位参与者回应，不再接受新的插话。');
     }
-    if (this.remainingRoleCalls(session) < 2) {
+    if (this.remainingRoleCalls(session) < 4) {
       throw new AppError(429, 'budget_exceeded', '模型调用预算不足，无法保证回应这条插话。');
     }
     const message = makeMessage({
@@ -656,6 +699,7 @@ export class SeminarEngine {
     });
     session.messages.push(message);
     session.pendingUserMessageIds.push(message.id);
+    this.responseProgress(session, message.id);
     await this.persist(session);
     if (session.stage === 'running') this.kick(session.id);
     return session;
@@ -680,14 +724,14 @@ export class SeminarEngine {
   }
 
   private triggerSummary(id: string): void {
-    void this.generateSummary(id, false).catch(async (error) => {
+    this.trackBackground(this.generateSummary(id, false).catch(async (error) => {
       const session = this.cache.get(id);
       if (!session) return;
       session.summary.status = 'error';
       session.summary.error = `总结生成失败：${safeMessage(error)}`;
       session.activity = { phase: 'idle', actorId: null, label: '', startedAt: null };
       await this.persist(session).catch(() => undefined);
-    });
+    }));
   }
 
   async generateSummary(id: string, regenerate: boolean): Promise<SeminarSession> {
@@ -855,7 +899,7 @@ export class SeminarEngine {
     }
     const runtime: Runtime = { busy: true, abort: new AbortController(), rerun: false };
     this.runtimes.set(id, runtime);
-    void this.runLoop(id, runtime).catch((error) => {
+    this.trackBackground(this.runLoop(id, runtime).catch((error) => {
       const session = this.cache.get(id);
       if (session && session.stage === 'running') {
         session.stage = 'error';
@@ -869,7 +913,7 @@ export class SeminarEngine {
         session.activity = { phase: 'idle', actorId: null, label: '', startedAt: null };
         void this.persist(session);
       }
-    });
+    }));
   }
 
   private abortRuntime(id: string): void {
@@ -885,6 +929,10 @@ export class SeminarEngine {
           break;
         }
         const last = session.messages.at(-1);
+        if (last?.role === 'host' && last.hostAction?.action === 'end') {
+          await this.finish(session, 'host_end');
+          break;
+        }
         const pendingMessages = this.pendingMessages(session);
         const hostAddressedPending =
           last?.hostAction !== undefined &&
@@ -916,18 +964,27 @@ export class SeminarEngine {
         await this.finish(session, 'call_limit');
         return;
       }
-      if (session.stage === 'paused') return;
-      session.stage = 'error';
+      // A paused in-flight request may still fail: retain the pause, but expose the failure.
+      if (session.stage !== 'paused') session.stage = 'error';
       session.stopReason = 'api_error';
       session.activity = { phase: 'idle', actorId: null, label: '', startedAt: null };
       const lastCall = session.calls.at(-1);
       session.lastError = {
-        code: error instanceof LlmRequestError ? `model_${error.kind}` : 'orchestration_error',
+        code: error instanceof LlmRequestError ? `model_${error.kind}` : error instanceof AppError ? error.code : 'orchestration_error',
         message: safeMessage(error),
         at: nowIso(),
         ...(lastCall ? { callId: lastCall.id } : {}),
         retryable: !(error instanceof SchemaError),
       };
+      const failedHost = session.messages.at(-1)?.hostAction;
+      const failedActor = failedHost?.participantId;
+      if (failedActor === 'a' || failedActor === 'b') {
+        for (const message of this.pendingMessages(session, failedActor)) {
+          const progress = this.responseProgress(session, message.id);
+          progress.failedActor = failedActor;
+          progress.error = session.lastError.message;
+        }
+      }
       await this.persist(session);
     } finally {
       const current = this.runtimes.get(id);
@@ -1083,6 +1140,10 @@ export class SeminarEngine {
     if (pending.length && !action.participantId) {
       throw new SchemaError('有用户插话时，必须指定一位参与者直接回应。');
     }
+    if (pending.length && (action.participantId === 'a' || action.participantId === 'b') &&
+        this.pendingMessages(session, action.participantId).length === 0) {
+      throw new SchemaError('该参与者已经回应全部待处理插话，请安排尚未回应的参与者。');
+    }
   }
 
   private async runParticipant(
@@ -1102,7 +1163,7 @@ export class SeminarEngine {
       roleKey,
       `${role.name} 正在阅读材料并组织回应…`,
     );
-    const pendingAtStart = this.pendingMessages(session);
+    const pendingAtStart = this.pendingMessages(session, roleKey);
     const meta: CallMeta = {
       role: 'participant',
       actorId: roleKey,
@@ -1151,14 +1212,15 @@ export class SeminarEngine {
       lastContent = result.content;
       callId = result.callId;
       try {
-        parsed = parseParticipant(extractJson(result.content), session.material.segments);
+        const candidate = parseParticipant(extractJson(result.content), session.material.segments);
         const pendingIds = pendingAtStart.map((message) => message.id);
-        const missing = pendingIds.filter((id) => !parsed!.addresses.includes(id));
-        if (missing.length && attempt === 0) {
+        const missing = pendingIds.filter((id) => !candidate.addresses.includes(id));
+        if (missing.length) {
           throw new SchemaError(
             `用户插话必须直接回应，但 addresses 缺少 ${missing.join('、')}。请在 addresses 中列出。`,
           );
         }
+        parsed = candidate;
         break;
       } catch (error) {
         lastError = error;
@@ -1169,7 +1231,23 @@ export class SeminarEngine {
         }
       }
     }
-    if (!parsed) throw lastError instanceof Error ? lastError : new SchemaError('参与者输出无效。');
+    if (!parsed) {
+      if (pendingAtStart.length) {
+        const message = `${role.name}未成功确认回应插话。待回应消息已保留；请重试，已成功的参与者不会重复执行。`;
+        for (const pending of pendingAtStart) {
+          const progress = this.responseProgress(session, pending.id);
+          progress.failedActor = roleKey;
+          progress.error = message;
+        }
+        // The shared session may be paused while awaiting the model response.
+        if (['paused'].includes(session.stage)) {
+          session.lastError = { code: 'user_response_failed', message, at: nowIso(), retryable: true };
+        }
+        await this.persist(session);
+        throw new AppError(502, 'user_response_failed', message);
+      }
+      throw lastError instanceof Error ? lastError : new SchemaError('参与者输出无效。');
+    }
     if (isEnded(session) || signal.aborted) return;
 
     const validAddresses = parsed.addresses.filter((id) =>
@@ -1201,15 +1279,32 @@ export class SeminarEngine {
     });
     session.messages.push(message);
     session.round = hostMessage.round;
-    const pendingSet = new Set(pendingIds);
-    session.pendingUserMessageIds = session.pendingUserMessageIds.filter((id) => !pendingSet.has(id));
+    for (const id of pendingIds) {
+      const progress = this.responseProgress(session, id);
+      if (!progress.completed.includes(roleKey)) progress.completed.push(roleKey);
+      if (progress.failedActor === roleKey) { delete progress.failedActor; delete progress.error; }
+    }
+    session.pendingUserMessageIds = session.pendingUserMessageIds.filter(id => {
+      const progress = this.responseProgress(session, id);
+      return progress.required.some(actor => !progress.completed.includes(actor));
+    });
     session.activity = { phase: 'idle', actorId: null, label: '', startedAt: null };
     await this.persist(session);
   }
 
-  private pendingMessages(session: SeminarSession): SeminarMessage[] {
+  private responseProgress(session: SeminarSession, id: string) {
+    session.userResponses ??= {};
+    return session.userResponses[id] ??= {
+      required: ['a', 'b'],
+      completed: (['a', 'b'] as const).filter(actor => session.messages.some(message =>
+        message.actorId === actor && message.participant?.directToUser && message.addresses.includes(id))),
+    };
+  }
+
+  private pendingMessages(session: SeminarSession, actor?: 'a' | 'b'): SeminarMessage[] {
     const ids = new Set(session.pendingUserMessageIds);
-    return session.messages.filter((message) => ids.has(message.id));
+    return session.messages.filter((message) => ids.has(message.id) &&
+      (!actor || !this.responseProgress(session, message.id).completed.includes(actor)));
   }
 
   private async finish(session: SeminarSession, reason: string): Promise<void> {

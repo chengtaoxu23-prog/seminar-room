@@ -1,17 +1,17 @@
 :root {
-  --paper: #f3efe6;
-  --paper-deep: #e9e2d5;
-  --card: #fffdf8;
-  --ink: #1d2a25;
-  --ink-soft: #4f5b54;
-  --muted: #7c857e;
-  --line: #d9d2c5;
-  --line-strong: #c5bbaa;
-  --teal: #186b5b;
-  --teal-deep: #0f4c41;
-  --teal-soft: #dcece6;
-  --orange: #b45f37;
-  --orange-soft: #f2e4d8;
+  --paper: #f7f8fa;
+  --paper-deep: #eef0f4;
+  --card: #ffffff;
+  --ink: #20232d;
+  --ink-soft: #596173;
+  --muted: #6c7484;
+  --line: #e3e6ed;
+  --line-strong: #cbd0dc;
+  --teal: #5c57c7;
+  --teal-deep: #4540a3;
+  --teal-soft: #eeedfc;
+  --orange: #a66332;
+  --orange-soft: #faf0e7;
   --amber: #9c6b1e;
   --amber-soft: #f5ecd7;
   --danger: #9b3d34;
@@ -19,7 +19,7 @@
   --shadow-sm: 0 1px 2px rgba(35, 39, 32, 0.06), 0 4px 16px rgba(35, 39, 32, 0.04);
   --shadow-md: 0 12px 40px rgba(35, 39, 32, 0.1);
   --font-sans: "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
-  --font-display: "Iowan Old Style", "Palatino Linotype", "Songti SC", "STSong", "Noto Serif SC", serif;
+  --font-display: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   --radius: 6px;
 }
 
@@ -138,7 +138,7 @@ code {
 
 .btn-primary {
   background: var(--teal);
-  color: #fffdf8;
+  color: #ffffff;
   border-color: var(--teal);
 }
 
@@ -539,7 +539,7 @@ code {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 4px;
-  background: #fffefa;
+  background: #ffffff;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -614,7 +614,7 @@ code {
 
 .role-grid select {
   appearance: none;
-  background: #fffefa;
+  background: #ffffff;
 }
 
 .create-actions {
@@ -1131,7 +1131,7 @@ code {
 
 .setup-facts > div {
   padding: 10px 12px;
-  background: #fffdf8;
+  background: #ffffff;
 }
 
 .setup-facts dt {
@@ -1457,7 +1457,7 @@ code {
 
 .material-segment.is-flashing {
   border-color: rgba(24, 107, 91, 0.35);
-  background: #fffdf8;
+  background: #ffffff;
   animation: flash-segment 1.8s ease;
 }
 
@@ -1758,7 +1758,7 @@ code {
   margin-top: 3px;
   border-radius: 50%;
   background: var(--teal);
-  color: #fffdf8;
+  color: #ffffff;
   font-family: var(--font-display);
   font-size: 15px;
 }
@@ -1969,7 +1969,7 @@ code {
   margin: 0 auto;
   padding: 10px 13px;
   border: 1px solid var(--line-strong);
-  background: #fffdf8;
+  background: #ffffff;
   font-size: 12.5px;
   line-height: 1.6;
   resize: none;
@@ -2030,7 +2030,7 @@ code {
   flex-direction: column;
   padding: 20px 18px 0;
   border-left: 1px solid var(--line);
-  background: #fbf8f0;
+  background: #ffffff;
 }
 
 .summary-panel .panel-heading {
@@ -2374,7 +2374,7 @@ code {
   gap: 2px;
   min-width: 0;
   padding: 8px 10px;
-  background: #fffdf8;
+  background: #ffffff;
 }
 
 .tech-grid span {

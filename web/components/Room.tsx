@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { SeminarSession, SummaryContent } from '../../src/shared/types';
 import { api, exportUrl } from '../api';
+import { WorkspaceNav, TeamPanel, EvidenceInspector, ModelIdentity, LineIcon } from './WorkspaceUI';
 import { Discussion } from './Discussion';
 import { MaterialPanel, type ActiveCitation } from './MaterialPanel';
 import { SummaryPanel } from './SummaryPanel';
@@ -25,6 +26,8 @@ export function Room({
   setSession: (session: SeminarSession) => void;
   onExit: () => void;
 }) {
+  const [resourceTab, setResourceTab] = useState<'team' | 'material' | 'summary'>('team');
+  const [summaryFocus, setSummaryFocus] = useState(false);
   const [activeCitation, setActiveCitation] = useState<ActiveCitation | null>(null);
   const [composer, setComposer] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
@@ -40,7 +43,7 @@ export function Room({
   const controlsLocked = busyAction !== null;
 
   useEffect(() => {
-    if (session.stage === 'ended' && session.summary.status !== 'generating') return;
+    if (session.stage === 'ended' && ['ready', 'error'].includes(session.summary.status)) return;
     let cancelled = false;
     const timer = window.setInterval(async () => {
       try {
@@ -142,7 +145,7 @@ export function Room({
     void runAction(
       'retry',
       () => api.retry(session.id),
-      '已重试。若上次主持人的安排已完成，会从被点名者的发言继续。',
+      '已重试。已成功回应的成员不会重复执行，待回应消息继续保留。',
     );
 
   const saveSummary = async (summary: SummaryContent) => {
@@ -172,24 +175,36 @@ export function Room({
     }
   };
 
+  const showCitation = (citation: ActiveCitation) => {
+    setResourceTab('material');
+    setActiveCitation(citation);
+  };
+  const showMessage = (id: string) => {
+    setSummaryFocus(false);
+    window.requestAnimationFrame(() => document.getElementById(`message-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  };
   const pendingCount = session.pendingUserMessageIds.length;
 
   return (
-    <div className="room-shell">
+    <div className={`room-shell research-room ${summaryFocus ? 'output-mode' : ''}`}>
+      <WorkspaceNav session={session} onHome={onExit} onOutput={(value) => { setSummaryFocus(value); setResourceTab('summary'); }} output={summaryFocus} />
+      <div className="room-workspace">
       <header className="room-top">
         <button type="button" className="brand brand-button" onClick={onExit} title="返回首页">
           <span className="brand-mark">S</span>
           <span className="brand-word">SeminarRoom</span>
         </button>
         <div className="room-title">
-          <span className="eyebrow">LIVE SEMINAR · 真实模型运行</span>
+          <span className="eyebrow">{summaryFocus ? 'RESEARCH OUTPUT / 研究成果' : 'SEMINAR ROOM / 协作研讨'}</span>
           <h1 title={session.config.topic}>{session.config.topic}</h1>
         </div>
         <div className="room-controls">
           <span className="round-chip">
             第 {session.round} / {session.limits.maxRounds} 轮
           </span>
-          <StageBadge stage={session.stage} />
+          {session.stage === 'paused' && session.stopReason === 'interrupted'
+            ? <span className="stage-badge stage-paused">服务中断 · 等待继续</span>
+            : <StageBadge stage={session.stage} />}
           {session.stage === 'running' && (
             <button type="button" className="btn btn-secondary btn-small" onClick={handlePause} disabled={controlsLocked}>
               {busyAction === 'pause' ? <Spinner size={13} /> : <PauseIcon />}
@@ -246,15 +261,22 @@ export function Room({
                   ? `已结束：${stopReasonLabels[session.stopReason ?? ''] ?? session.stopReason}`
                   : '调用出错，等待重试'}
           </span>
-          {pendingCount > 0 && <span className="pending-chip">{pendingCount} 条插话待回应</span>}
+          {pendingCount > 0 && <span className="pending-chip">{pendingCount} 条插话{session.stage === 'ended' ? '未完成回应' : '待回应'}</span>}
         </div>
         <div className="status-right">
           <span>
-            {session.provider.model} · {session.provider.baseUrlHost}
+            <ModelIdentity model={session.provider.model} /> · 配置模型
           </span>
           <span>已保存 {clockLabel(session.updatedAt)}</span>
         </div>
       </div>
+
+      {pendingCount > 0 && <div className="response-progress" aria-label="插话回应进度">
+        {session.pendingUserMessageIds.map((id, index) => {
+          const progress = session.userResponses?.[id];
+          return <span key={id}>插话 {index + 1} · {progress ? progress.required.map(key => `${session.roles[key].name}${progress.completed.includes(key) ? '已回应' : progress.failedActor === key ? '回应失败，待重试' : '待回应'}`).join(' / ') : '等待成员回应'}{progress?.completed.length ? ' · 重试保留已完成进度' : ''}</span>;
+        })}
+      </div>}
 
       {actionError && (
         <div className="banner banner-error">
@@ -265,12 +287,18 @@ export function Room({
           </button>
         </div>
       )}
-      {session.stage === 'error' && session.lastError && (
+      {session.stage === 'paused' && session.stopReason === 'interrupted' && (
+        <div className="banner banner-info">
+          <strong>服务曾中断</strong>
+          <span>已保留发言和任务进度，未自动调用模型。点击“继续”后才会恢复执行。</span>
+        </div>
+      )}
+      {(session.stage === 'error' || session.stage === 'paused') && session.lastError && session.lastError.code !== 'session_interrupted' && (
         <div className="banner banner-error">
-          <strong>模型调用失败</strong>
+          <strong>{session.lastError.code === 'user_response_failed' ? '插话回应失败 · 消息已保留' : '模型调用失败'}</strong>
           <span>{session.lastError.message}</span>
-          <button type="button" className="btn btn-small btn-secondary" onClick={handleRetry}>
-            重试
+          <button type="button" className="btn btn-small btn-secondary" onClick={session.stage === 'paused' ? handleResume : handleRetry}>
+            {session.stage === 'paused' ? '继续' : '重试'}
           </button>
         </div>
       )}
@@ -288,22 +316,20 @@ export function Room({
         </div>
       )}
 
-      <main className="room-grid">
-        <MaterialPanel
-          segments={session.material.segments}
-          questions={session.questions}
-          activeCitation={activeCitation}
-        />
+      <main className={`room-grid collaboration-grid ${summaryFocus ? 'focus-summary' : ''}`}>
         <section className="center-column">
+          <div className="discussion-heading"><h2>团队讨论</h2><span>{session.messages.length} 条消息</span><button className="text-button" onClick={() => { setSummaryFocus(true); setResourceTab('summary'); }}>查看成果 ↗</button></div>
           <Discussion
             messages={session.messages}
             roles={session.roles}
             activity={session.activity}
             stage={session.stage}
             scrollRef={scrollRef}
-            onCite={setActiveCitation}
+            onCite={showCitation}
+            model={session.provider.model}
           />
           <div className="composer-wrap">
+            <div className="composer-toolbar"><span><LineIcon name="chat"/>参与这场研讨</span><div>{session.stage === 'running' && <button className="btn btn-small btn-secondary" disabled={controlsLocked} onClick={handlePause}>暂停研讨</button>}{session.stage === 'paused' && <button className="btn btn-small btn-secondary" disabled={controlsLocked} onClick={handleResume}>继续研讨</button>}{isActive && <button className="btn btn-small btn-ghost" disabled={controlsLocked} onClick={handleEnd}>结束研讨</button>}<button className="btn btn-small btn-ghost" onClick={()=>{setSummaryFocus(true);setResourceTab('summary');}}>研究成果</button></div></div>
             {session.stage === 'ended' ? (
               <div className="ended-footer">
                 <div>
@@ -363,17 +389,31 @@ export function Room({
             )}
           </div>
         </section>
+        <section className="resource-column" aria-label="材料与成果">
+          <div className="resource-tabs" role="tablist" aria-label="材料与成果切换">
+            {!summaryFocus && <button role="tab" aria-selected={resourceTab === 'team'} onClick={() => setResourceTab('team')}>团队</button>}
+            <button role="tab" aria-selected={resourceTab === 'material'} onClick={() => setResourceTab('material')}>材料 <span>{session.material.segments.length}</span></button>
+            <button role="tab" aria-selected={resourceTab === 'summary'} onClick={() => setResourceTab('summary')}>成果总结</button>
+            <button className="resource-expand" aria-label={summaryFocus ? '返回讨论布局' : '展开成果阅读'} onClick={() => setSummaryFocus(!summaryFocus)}>{summaryFocus ? '↙' : '↗'}</button>
+          </div>
+          <div className="resource-content team-resource" hidden={resourceTab !== 'team'}><TeamPanel session={session}/><section className="current-task-panel"><div className="section-title"><h2><LineIcon name="activity"/>当前执行</h2></div><p>{session.stage === 'running' ? session.activity.label || '等待下一步调度' : session.stage === 'paused' ? '已暂停，等待用户继续' : session.stage === 'ended' ? '讨论已收束，成果可整理与导出' : '调用失败，等待手动处理'}</p><div className="task-rounds">{Array.from({length:session.limits.maxRounds},(_,i)=><span key={i} className={i < session.round ? 'completed' : ''}>{i+1}</span>)}</div><small>已完成 {session.round} / {session.limits.maxRounds} 轮 · {session.calls.length} 次调用</small></section></div>
+          <div className="resource-content" hidden={resourceTab !== 'material'}><MaterialPanel segments={session.material.segments} questions={session.questions} activeCitation={activeCitation} messages={session.messages} onMessage={showMessage} /></div>
+          <div className="resource-content" hidden={resourceTab !== 'summary'}>
         <SummaryPanel
           summary={session.summary}
           stage={session.stage}
           onSave={saveSummary}
           onRegenerate={regenerateSummary}
-          onCite={setActiveCitation}
+          onCite={showCitation}
           saving={savingSummary}
           actionError={null}
         />
+          </div>
+        </section>
+        {summaryFocus && <EvidenceInspector session={session} onCite={showCitation} />}
       </main>
 
+      </div>
       {techOpen && (
         <div className="drawer-backdrop" role="presentation" onClick={() => setTechOpen(false)}>
           <aside

@@ -40,7 +40,7 @@ function Section({
   onRemove: (index: number) => void;
 }) {
   return (
-    <section className="summary-section">
+    <section className="summary-section" aria-label={title}>
       <div className="summary-section-head">
         <h3>{title}</h3>
         <span>{items.length}</span>
@@ -86,6 +86,7 @@ export function SummaryPanel({
   saving,
   actionError,
 }: EditableProps) {
+  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<SummaryContent>(() => contentOf(summary));
   const serverContent = useMemo(() => contentOf(summary), [summary]);
 
@@ -212,7 +213,16 @@ export function SummaryPanel({
         </details>
       )}
 
-      <div className="summary-scroll">
+      <div className="output-edit-toolbar"><span>{dirty ? '有未保存的修改' : '研究文档'}</span><button className="btn btn-secondary btn-small" onClick={() => setEditing(!editing)}>{editing ? '阅读成果' : '编辑成果'}</button></div>
+      <div className="summary-scroll summary-reading" hidden={editing}>
+        <div className="document-title"><span className="eyebrow">RESEARCH DOCUMENT</span><h2>研究结论与证据</h2><p>根据团队讨论形成 · 保留不同意见 · 可人工修订</p></div>
+        <section className="summary-section"><h3>共识 <span>{draft.consensus.length}</span></h3>{draft.consensus.length ? draft.consensus.map((text,i)=><div className="document-point" key={i}><span>{String(i+1).padStart(2,'0')}</span><p>{text}</p></div>) : <p className="summary-empty">暂无共识</p>}</section>
+        <section className="summary-section"><h3>分歧 <span>{draft.disagreements.length}</span></h3>{draft.disagreements.length ? draft.disagreements.map((text,i)=><div className="document-point disagreement-point" key={i}><span>{String(i+1).padStart(2,'0')}</span><p>{text}</p></div>) : <p className="summary-empty">暂无分歧记录</p>}</section>
+        <section className="summary-section"><h3>材料依据 <span>{draft.evidence.length}</span></h3>{draft.evidence.map((e,i)=><div className="document-evidence" key={i}><button className="citation" onClick={()=>onCite({paragraphId:e.paragraphId,quote:e.quote,nonce:Date.now()})}>材料 {e.paragraphId}</button><blockquote>{e.quote}</blockquote><p>{e.note}</p></div>)}{!draft.evidence.length && <p className="summary-empty">没有通过核对的材料依据，不补写。</p>}</section>
+        <section className="summary-section"><h3>未解决问题 <span>{draft.unresolved.length}</span></h3>{draft.unresolved.map((text,i)=><div className="document-point unresolved-point" key={i}><span>?</span><p>{text}</p></div>)}</section>
+        <p className="summary-caveat">AI 研讨不是事实核查；引用核对只证明原文存在，不证明结论正确。</p>
+      </div>
+      <div className="summary-scroll summary-editor" hidden={!editing}><div className="document-title"><span className="eyebrow">RESEARCH DOCUMENT</span><h2>研究结论与证据</h2><p>根据团队讨论形成 · 保留不同意见 · 可人工修订</p></div>
         <Section
           title="共识"
           hint="只写双方实际表达过的共同点。"
@@ -291,7 +301,7 @@ export function SummaryPanel({
       </div>
 
       {actionError && <div className="inline-error">{actionError}</div>}
-      <div className="summary-actions">
+      <div className="summary-actions" hidden={!editing}>
         <button
           type="button"
           className="btn btn-primary"

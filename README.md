@@ -1,324 +1,136 @@
-# SeminarRoom
+# GTM-RedTeam v0.1.0-alpha
 
-> 把一段材料，变成一场可参与、可暂停、可核对引用的 AI 研讨课。
+**Evidence-backed Adversarial GTM Audit Workbench.** A local workbench for analysts reviewing overseas market-entry plans against the materials they can actually inspect.
 
-SeminarRoom 是一个范围刻意收小的开源实验：用户粘贴中文材料，系统自动编号分段并生成三个讨论问题；主持人、参与者 A、参与者 B 通过**独立的模型上下文**和结构化消息交接，进行最多六轮研讨；用户可以随时插话、暂停、继续或结束，最后得到可编辑的共识、分歧、材料依据与未解决问题，并导出 Markdown / JSON。
+> **Release status:** Mock workflow engineering-tested. A real OpenAI-compatible adapter is implemented and tested with HTTP stubs; **live model execution has not been tested**. Commercial risk-discovery quality has no formal benchmark. No GPT comparison has been performed. Token estimates are not calibrated to a provider. Local, single-user alpha; TXT, MD and pasted text only. No web research, RAG, PDF or DOCX parsing.
 
-![SeminarRoom 首页](docs/screenshots/landing.png)
+**The model proposes. The verifier checks. The server decides. The human reviews.**
 
-**项目阶段：公开实验版。** 面向短材料阅读与讨论；需要在本机运行，并自行配置模型 API。项目使用 AI 编程工具辅助实现。独立复验结果与能力边界见 [发布状态](docs/release-status.md)。
+## Why this exists
 
-快速了解：[产品与设计](docs/product.md) · [测试证据](docs/test-record.md) · [演示脚本](docs/demo-script.md)。
+Consulting analysts, international PMMs, strategy teams and early-stage investment analysts need to distinguish commercial facts from plausible stories. A fluent model answer may contain an invented quote, a real quote that does not support the conclusion, or fabricated CAC/LTV figures. Rechecking those claims is part of the work.
 
-配置模型后，相关材料与讨论内容会发送给你选择的模型服务商；会话保存在本机。
+GTM-RedTeam structures that review: an initial GTM proposal, independent challenges, source checks, one rebuttal, and a deterministic report. It aims to make the evidence chain inspectable. It does not certify that a commercial risk is objectively true or claim better analysis than a general-purpose LLM.
 
-> **交付状态（重要）**
->
-> 核心流程、引用核对、暂停/结束、保存/导出、示例回放已经实现，并通过 8 项自动化测试与一轮浏览器端到端测试。浏览器 E2E 使用本地测试替身（`scripts/mock-openai.mjs`），**不是真实模型**。
->
-> 当前环境没有可用的模型 API 密钥，因此**真实模型验收未完成**。仓库不包含真实运行报告，不把 mock 或示例回放当作真实能力证据。配置服务端密钥后，运行 `npm run check:live` 生成真实的 `docs/live-run.json`。详见 [HANDOFF.md](HANDOFF.md)。
+## Workflow
 
-## 目录
-
-- [它解决什么问题](#它解决什么问题)
-- [已实现的能力](#已实现的能力)
-- [快速开始](#快速开始)
-- [模型配置](#模型配置)
-- [使用流程](#使用流程)
-- [三个角色如何独立工作](#三个角色如何独立工作)
-- [引用、材料与背景知识](#引用材料与背景知识)
-- [暂停、结束与失败](#暂停结束与失败)
-- [保存与导出](#保存与导出)
-- [示例回放](#示例回放)
-- [限制与边界](#限制与边界)
-- [自测](#自测)
-- [项目结构](#项目结构)
-- [参考与许可](#参考与许可)
-
-## 它解决什么问题
-
-普通的“和文档聊天”通常只有一条对话、一个回答。真实研讨需要的是：
-
-- 一个主持人决定下一步：先问什么、让谁回应、何时收束；
-- 两个视角不同的参与者，各自读材料、互相回应，而不是轮流复述；
-- 用户随时打断，主持人必须重新安排，而不是继续播放预写剧本；
-- 每一个材料引用都能回到真实段落；
-- 讨论结束后，总结里的共识、分歧和依据可以核对、可以编辑。
-
-SeminarRoom 只做这条主路径。它不做课件、白板、语音、数字人或多人课堂。
-
-## 已实现的能力
-
-| 能力 | 实现 |
-| --- | --- |
-| 材料编号分段 | 保留原文，按空行/长段拆分，生成稳定的 `材料 1..N` 编号 |
-| 三个讨论问题 | 一次真实“备课主持人”调用；用户可编辑，最多 120 字/题 |
-| 真实三角色编排 | 主持人、参与者 A、参与者 B 分别组装上下文并独立调用模型 |
-| 工具读取材料 | `read_material(ids/query)`，Agent 可以按编号或关键词读取原文，技术记录显示工具调用 |
-| 引用核对 | 引文必须是某个编号段落中的逐字连续子串；无效引用被隐藏并显示警告 |
-| 背景知识区分 | `background` 块标成“模型背景 · 非材料”，强制移除其材料引用 |
-| 用户插话 | 加入待回应队列；主持人必须把用户消息 ID 放进安排，参与者必须直接回应 |
-| 暂停 / 继续 | 暂停后不再调度新调用；进行中的一次调用结束后停止，继续时由主持人重新决定 |
-| 结束 | 用户结束会中止进行中的调用；之后只允许独立的“总结员”调用 |
-| 总结 | 共识、分歧、材料依据、未解决问题；可编辑并保存 |
-| 本地保存 | 服务端 JSON 持久化，刷新后可按 URL 恢复 |
-| 导出 | Markdown 和技术记录、完整 JSON |
-| 示例回放 | 一条预先编写的回放，明确标注“非实时模型输出” |
-| 技术记录 | 每次请求的角色、用途、状态、耗时、token、工具调用、上下文指纹、错误 |
-| 硬上限 | 轮次、调用数、输出 token、请求超时，均由环境变量配置 |
-
-## 快速开始
-
-要求：Node.js **>= 20.19**，npm（仓库包含 `package-lock.json`）。
-
-```bash
-git clone https://github.com/chengtaoxu23-prog/seminar-room.git
-cd seminar-room
-npm ci
-cp .env.example .env.local      # Windows PowerShell: Copy-Item .env.example .env.local
-# 编辑 .env.local，填入服务端模型配置
-npm run dev
+```mermaid
+flowchart LR
+  A[Blue Proposal] --> B[Red Challenge]
+  B --> C[Verifier: citation integrity and semantic review]
+  C --> D[Blue Rebuttal: one round, with evidence review]
+  D --> E[Deterministic Convergence]
+  E --> F[Human Review and Markdown export]
 ```
 
-打开：
+The rebuttal verifier is an internal part of stage four, not a sixth business phase. No second Blue/Red round is run. Zero supported risks is a valid result.
 
-- 前端开发地址：<http://127.0.0.1:5173>
-- API：<http://127.0.0.1:4317>
+## Evidence and decisions
 
-生产构建：
+- Each quote identifies a Source ID, material revision hash and paragraph ID.
+- A deterministic continuous-substring check runs before narrowly defined normalization. Numeric, currency and unit meaning must be preserved.
+- Semantic review separately judges whether evidence supports the claim and its reasoning. Quote existence alone proves neither relevance nor commercial risk.
+- The server derives `material_fact`, `inference`, `hypothesis` or `insufficient_evidence`; model-supplied labels cannot override it.
+- Sources and selection are frozen once started. Changing materials requires a new audit. Invalid citations stay out of verified evidence.
+- Unknown CAC, LTV and other operating data must remain unknown. Human decisions and notes are stored separately from machine findings.
 
-```bash
+## Three screens
+
+These screenshots show **synthetic Mock material and output**, not real commercial audit results.
+
+| Prepare sources and budget | Inspect evidence and review | Read and export |
+| --- | --- | --- |
+| ![Mock preparation](docs/screenshots/gtm-home.png) | ![Mock audit](docs/screenshots/gtm-audit.png) | ![Mock report](docs/screenshots/gtm-report.png) |
+
+The workbench shows mode, configured model, lifecycle, estimated tokens, actual usage, call count, citation checks, semantic review and classifications. Missing usage is **不可用 / unavailable**, never an estimate presented as actual usage. Stage timestamps use recorded call times; convergence has no independent start/end timestamps and shows “未提供”.
+
+## Architecture and stack
+
+React 19 + Vite + TypeScript; Express API; schema-validated local JSON persistence. The existing executor owns five-stage progression; the repository owns frozen records, atomic persistence and the shared request ledger. Both Providers use that executor and the same verifiers. Convergence and Markdown are generated by TypeScript, not a model.
+
+See [architecture](docs/architecture/gtm-alpha.md), [API and provider boundaries](docs/provider-guide.md), and the retained [P1-B design](docs/architecture/gtm-redteam-p1b.md). SeminarRoom is the MIT-licensed predecessor; legacy modules and tests remain for provenance and regression coverage.
+
+## Install and start
+
+Requirements: Node.js >=20.19 and npm. Windows is the validated desktop environment. Run from the repository root:
+
+```sh
+npm ci
 npm run build
 npm start
-# http://127.0.0.1:4317
 ```
 
-`npm start` 需要先构建；它会把 `dist/web` 作为静态站点提供，服务只绑定 **127.0.0.1**。
+Open [the local workbench](http://127.0.0.1:4317). The server binds only to loopback. Without a GTM configuration file it uses offline Mock mode. Stop the terminal process to stop the service. Port 4317 must be free; do not terminate an unrelated service to free it.
 
-### 没有密钥可以先看什么
+For development: `npm run dev` (Vite on 5173, API on 4317).
 
-- 首页三份测试材料可以载入表单，但真实研讨按钮会被禁用；
-- 点击“查看示例回放”可以看完整的交互脚本；
-- 示例回放明确标为“非实时模型 / 预置脚本”，不会产生调用，也不会伪造技术记录。
+## Offline Mock demo
 
-## 模型配置
+Create an audit, add a clearly labelled synthetic TXT/MD or paste synthetic text, select whole sources, check the budget, then start Mock. Expand evidence, add Human Review, open the report, export Markdown and refresh. Mock uses fixed synthetic results and deliberately retains insufficient evidence / unresolved rebuttals. It cannot assess your market.
 
-SeminarRoom 使用一个 OpenAI 兼容的 `/chat/completions` 接口。密钥只在 Node 服务端读取，浏览器拿不到，也不会写入日志、`localStorage` 或仓库。
+**材料可以保存，不代表一次审计能全部处理。** Default storage is 300,000 Unicode characters, material estimate budget 24,576 tokens, and complete request estimate budget 49,152 tokens. Whole sources are included or excluded. Nothing is silently truncated; every model request is checked again before dispatch.
 
-`.env.local`：
+## Real Provider configuration — not live-validated
+
+Copy `.env.example` to `.env.gtm.local`, then edit that file locally. Do not paste keys into the browser, issue tracker or chat. GTM does not load the legacy `.env.local` file or reuse its OpenAI key automatically.
 
 ```dotenv
-OPENAI_API_KEY=your-server-side-key
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_MODEL=gpt-4o-mini
+GTM_PROVIDER=openai-compatible
+GTM_BASE_URL=https://your-provider.example/v1
+GTM_MODEL=your-model-name
+GTM_API_KEY=fill-locally
+GTM_MAX_CALLS=5
+GTM_TIMEOUT_MS=60000
 ```
 
-也支持 DeepSeek 等兼容服务：
+HTTPS is required except for a loopback HTTP endpoint. Credentials in URL/query strings are rejected. Only the server uses the key; config responses expose mode/model and limits, not credentials. `mock` is explicit offline mode; configuration and request errors in real mode never switch to Mock.
 
-```dotenv
-OPENAI_API_KEY=...
-OPENAI_BASE_URL=https://api.deepseek.com/v1
-OPENAI_MODEL=deepseek-chat
+```sh
+npm run check:gtm-config
 ```
 
-如果 `OPENAI_BASE_URL` 已经以 `/chat/completions` 结尾，会直接使用；否则自动追加。
+This validates configuration and constructs the adapter with **zero network calls**. Restart `npm start` to use changed settings. Before starting a real audit, the UI requires informed agreement to send the business description, market, supplementary context and selected sources to the configured supplier.
 
-| 变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `OPENAI_API_KEY` | 空 | 必填；缺失时 `/api/health` 显示未配置，真实研讨不可用 |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI 兼容 API 根地址 |
-| `OPENAI_MODEL` | `gpt-4o-mini` | 模型名称 |
-| `SEMINAR_PORT` | `4317` | 本地服务端口；绑定地址固定为 `127.0.0.1` |
-| `SEMINAR_MAX_ROUNDS` | `6` | 1—6 轮，超过六轮不允许 |
-| `SEMINAR_MAX_CALLS` | `30` | 所有模型请求上限，含问题生成、工具续调、校验修复和总结 |
-| `SEMINAR_MAX_OUTPUT_TOKENS` | `700` | 单次输出上限 |
-| `SEMINAR_REQUEST_TIMEOUT_MS` | `60000` | 单次请求超时 |
-| `SEMINAR_TEMPERATURE` | `0.55` | 0—1.5 |
-| `SEMINAR_DATA_DIR` | `./data/sessions` | 会话 JSON 保存目录 |
+One request times out after 60 seconds by default. Per-request input estimate is capped at 49,152 tokens. Output caps: Blue 2,048; Red 16,384; Red Verifier 8,192; Blue Rebuttal 12,288; rebuttal Verifier 8,192. The ledger caps real audits at 5 dispatched calls by default, including any repair; configurable maximum is 10. A five-call cap can stop an audit that needs repairs. Estimated limits are not provider-calibrated counts.
 
-> 模型需要支持工具调用（`tools` / `tool_calls`）和较稳定的 JSON 输出。SeminarRoom 会解析 JSON、对结构错误做一次修复调用、对引用逐字核对；它不能保证任意模型都稳定遵循格式。
+### Approval-gated live smoke test
 
-## 使用流程
+No live smoke test has been run. After explicit user approval and local configuration only:
 
-1. 粘贴中文材料，填写主题。材料会自动编号分段。
-2. 点击“生成三个问题”。这是一次真实调用；生成后进入确认页，三个问题都可以修改。
-3. 点击“开始研讨”。主持人先决定开场和第一位发言人。
-4. A / B 各自读取相关材料段落，可以调用 `read_material` 查更多原文，然后输出结构化发言。
-5. 用户随时可以在底部插话。主持人下一步必须优先安排相关参与者直接回应用户，而不是继续原计划。
-6. 主持人可以继续提问、要求澄清或结束；达到六轮也会自动结束。
-7. 结束后，独立的总结员生成可编辑总结；你可以修改共识/分歧/未解决问题，并保存。
-8. 用 Markdown 或 JSON 导出完整记录。
-
-## 三个角色如何独立工作
-
-没有“一次调用生成全部剧本”。
-
-```
-主持人调用
-  → 结构化 HostAction: invite / clarify / end
-  → 若 invite：把 publicMessage 显示给用户，把 prompt / focus / 回应对象交给一位参与者
-参与者调用
-  → 独立组装上下文（角色设定、自己的立场、相关材料、近期讨论、待回应内容）
-  → 输出结构化 blocks + citations + addresses
-  → 回到主持人，由主持人重新决定下一步
+```sh
+npm run smoke:gtm-real -- --approve-real-smoke
 ```
 
-- **主持人**拿到材料索引、三个问题、角色表、待回应用户消息和最近发言；需要原文时可调用工具。
-- **参与者**拿到与其任务相关的材料段落、自己的前几次发言、近期讨论、主持人的具体任务、要回应的消息；不拿到另外两位角色的“系统提示”。
-- **总结员**是独立调用，只整理实际发生的讨论和材料原文，不再扮演角色。
-- 每次调用都有自己的 `contextHash`，在“技术记录”中可以看到三种角色互不相同的上下文指纹。
-- 代码不会把一次模型输出拆成三条假消息，也不会用延时动画伪装实时协作；技术记录中的每次请求都来自 `server/seminar.ts` 的真实调用。
+This performs one synthetic audit with **at most 5 total dispatched requests, repairs included**. Expected model stages are Blue, Red, Red Verifier, Blue Rebuttal and rebuttal Verifier; stages may be skipped when no eligible evidence exists. Convergence makes no model request. If a repair consumes the cap, the run may fail without a report; it is not silently rerun. The command reports connection/workflow/usage outcomes, not analytical quality. Records and any report stay in ignored `data/`. Running it without the approval flag sends no request. See [provider guide](docs/provider-guide.md) before approving it.
 
-### 结构化交接
+## Tests
 
-主持人 JSON：
-
-```json
-{
-  "action": "invite",
-  "participantId": "a",
-  "publicMessage": "……",
-  "prompt": "给参与者的具体任务，不替对方写答案",
-  "focus": "本轮聚焦点",
-  "addressUserMessageIds": [],
-  "respondToMessageIds": [],
-  "reason": "为什么这样安排",
-  "endReason": null
-}
-```
-
-参与者 JSON：
-
-```json
-{
-  "blocks": [
-    {
-      "type": "evidence",
-      "text": "……",
-      "citations": [{ "paragraphId": 2, "quote": "逐字原文" }]
-    }
-  ],
-  "addresses": ["要直接回应的消息 id"],
-  "stanceUpdate": { "changed": false, "note": "" }
-}
-```
-
-服务端会校验字段、引用、消息 ID 和状态规则；失败会做一次修复调用，仍失败则进入可见的错误状态，而不是伪造成功。
-
-## 引用、材料与背景知识
-
-- 材料被编号；界面左侧是原文。
-- 参与者只能引用真实存在的段落编号。
-- `quote` 必须是该段落中的**逐字连续子串**；使用省略号、改写或跨段拼接都会被判为无效。
-- 无效引用会从消息中隐藏，并把标为“材料证据”的块降级为“观点”；界面显示核对提示。
-- 点击“材料 N”会滚动到左侧对应段落并高亮引文。
-- `background` 块统一显示为“模型背景 · 非材料”，且不接受材料引用。
-- 总结中的材料依据也会再次逐字核对；核对不通过的条目会被移除。
-
-这保证的是“引用确实来自原文”，而不是“观点一定正确”。AI 研讨仍然只是观点演练，不是事实裁决。
-
-## 暂停、结束与失败
-
-| 操作 | 行为 |
-| --- | --- |
-| 暂停 | 设置 `stage=paused`；当前进行中的一次请求可以结束并写入结果，但之后不再调度任何新的主持/参与者调用 |
-| 继续 | 由主持人重新读取当前状态，决定下一步，不恢复固定剧本 |
-| 用户插话 | 进入 `pendingUserMessageIds`；下一次主持人安排必须包含用户消息 ID；参与者输出 `directToUser=true` 并在界面标注“直接回应你” |
-| 结束 | 设置 `stage=ended`，中止进行中的请求；不再有新的角色调用，只允许一次独立总结调用 |
-| 调用失败 | 记录错误、请求状态和可见错误横幅；可重试；失败不会被显示为成功 |
-| 达到轮次/调用上限 | 停止并生成已有总结；技术记录显示停止原因 |
-
-默认最多 6 轮；每一轮是一次“主持人 + 一位参与者”的交接。调用数达到上限前会预留一次总结调用。
-
-## 保存与导出
-
-- 每次状态变化写入服务端 `data/sessions/<session-id>.json`。
-- 会话 ID 写入 URL（`?session=...`）与浏览器 `localStorage`；刷新会自动读回。
-- “保存”不需要手动点击：服务端持续保存，界面显示最后保存时间。
-- 总结编辑点击“保存编辑”后写回服务端。
-- 导出：
-  - `GET /api/sessions/:id/export.md`
-  - `GET /api/sessions/:id/export.json`
-- 导出内容直接来自服务端实际会话状态，包含技术记录和编辑后的总结；不包含 API 密钥、原始提示词或模型响应体。
-- JSON 是完整状态；Markdown 是便于阅读的记录。
-
-## 示例回放
-
-示例回放位于 `examples/replay.ts`，使用虚构材料《共学空间的开放时间》。
-
-- 明确标注“示例回放 · 非实时模型输出”；
-- 页面显示“预置脚本 / 0 次实时模型调用”；
-- 不生成技术调用记录，避免伪造；
-- 用户插话是脚本的一部分，展示“先回应用户”的交互形态；
-- 总结是预先编写的示例，不是模型输出。
-
-![示例回放](docs/screenshots/replay-full.png)
-
-## 限制与边界
-
-- 单用户、本地单进程；没有登录、权限或多人协作。
-- 会话存放在本地 JSON 文件，不是数据库；不适合公网部署。
-- 没有 PDF、图片、音频/视频、语音、联网搜索、数字人、云同步。
-- 前端使用轮询刷新（约 1 秒），不是 SSE/WebSocket。
-- 模型生成的结论不是事实；引用核对只验证“原文是否真的存在”。
-- 工具调用要求所选模型支持 OpenAI 风格的 `tools`。
-- 项目不估算费用；只记录接口返回的 token 用量；未返回时显示“接口未返回”。
-- 质量取决于模型对中文、JSON、工具调用和引用指令的遵循程度。
-
-## 自测
-
-```bash
-npm run typecheck
+```sh
 npm test
+npm run typecheck
 npm run build
+npm run check:gtm-config
+npm run test:e2e:gtm -- ./work/browser-evidence
 ```
 
-当前结果见 [docs/test-record.md](docs/test-record.md)。
+The browser test needs Microsoft Edge at its standard Windows location, or a Chromium executable provided through `GTM_CHROMIUM_PATH`. Unit and integration tests use offline stubs/local test servers. A real-adapter stub test is not a live-model validation. Node's test summary includes parent containers; report independent leaf tests separately. Existing legacy test commands remain available but the GTM E2E command is the current workbench acceptance path.
 
-真实模型验收（需要服务端已配置可用密钥）：
+## Security and privacy
 
-```bash
-npm start              # 终端 1
-npm run check:live     # 终端 2
-```
+Local data is **not encrypted**. The repository stores business inputs, raw source snapshots, model outputs, prompt snapshots, citations, ledger and human notes under ignored `data/`. Keep that directory private. Source material and model output are not written to debug logs. A supplier receives selected inputs only after a real audit is explicitly started; its privacy/retention policies are outside this workbench's control.
 
-`check:live` 会拒绝把 `mock/fake/e2e` 模型当作真实模型，并写出不包含密钥的 `docs/live-run.json`。
+Never publish `.env*`, runtime data, local logs, cache, backups, ZIP/PATCH artifacts, or real business screenshots. `.env.example` is the only allowed environment template. Review [release safety](docs/release-safety.md) and run `npm run check:release` before staging. The scanner reports locations/types, not secret values; pattern scans cannot prove absence of every sensitive item. No accounts, remote hosting or multi-user access are supported.
 
-浏览器端到端测试使用测试替身，命令见测试记录；该测试只证明 UI 与 API 流程，不证明真实模型能力。
+## Limits and roadmap
 
-## 项目结构
+Implemented: real adapter, own-material input, structured execution, deterministic citation checks/classification, evidence gaps, independent Human Review and export. Mock flow is engineering-validated. Live connectivity, provider-specific JSON behavior and real analytical quality remain unverified. Interruptions use existing recovery behavior; no new automatic recovery is added. Earlier persisted report formats have not been migration-tested.
 
-```
-seminar-room/
-├── server/
-│   ├── index.ts          # 绑定 127.0.0.1 的 Node 入口
-│   ├── routes.ts         # HTTP API
-│   ├── seminar.ts        # 编排、预算、暂停/结束、总结、工具循环
-│   ├── prompts.ts        # 三角色与总结提示
-│   ├── validation.ts     # JSON 结构、引用逐字核对
-│   ├── store.ts          # 本地 JSON 持久化
-│   ├── export.ts         # Markdown / JSON 导出
-│   └── config.ts         # 环境变量与硬上限
-├── src/shared/           # 前后端共享类型、分段与检索
-├── web/                  # React + TypeScript 界面
-├── examples/             # 三份自撰材料、示例回放
-├── tests/                # Node test 单元/编排测试
-├── scripts/              # mock E2E、visual check、真实模型验收
-├── docs/
-│   ├── product.md        # 产品与设计说明
-│   ├── demo-script.md    # 约 90 秒演示脚本
-│   ├── test-record.md    # 实际测试记录
-│   └── screenshots/
-├── HANDOFF.md
-├── .env.example
-├── package.json
-└── package-lock.json
-```
+Next gates: approved five-request live smoke; analyst usability/utility review; then the preregistered [evaluation plan](docs/evaluation-plan.md). Paid demand, time savings and advantage over direct GPT use are questions, not current product claims. Deployment, broader parsing and collaboration are outside this alpha.
 
-## 参考与许可
+## License
 
-SeminarRoom 的概念参考了 [THU-MAIC/OpenMAIC](https://github.com/THU-MAIC/OpenMAIC)（MIT License，Copyright (c) 2026 THU-MAIC）的多 Agent 课堂与材料工具机制，但**没有复制其代码**，也不是其精简分支。
+[MIT](LICENSE). Retains SeminarRoom contributors' copyright and provenance. Dependencies retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.md).
 
-本仓库代码使用 MIT License，见 [LICENSE](LICENSE)。
+## 中文简介
 
-产品取舍、资料使用、参考来源和设计决策见 [docs/product.md](docs/product.md)。
+GTM-RedTeam 是面向出海咨询分析师的证据型 GTM 审计工作台。它用固定五阶段、原文核验、独立语义审查、服务端分类和人工复核，让商业质询能够回到材料，或明确标注证据不足。当前为本地单用户 Alpha；Mock 已完成工程验证，真实接口仅完成代码与 stub 测试，尚未进行真实模型冒烟，也未证明优于直接使用 GPT。

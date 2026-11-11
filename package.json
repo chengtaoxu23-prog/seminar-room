@@ -1,21 +1,27 @@
 {
-  "name": "seminar-room",
-  "version": "0.1.0",
+  "name": "gtm-redteam",
+  "version": "0.1.0-alpha",
   "private": true,
   "type": "module",
-  "description": "把一段材料变成可参与的 AI 研讨课",
+  "description": "Evidence-backed Adversarial GTM Audit Workbench",
   "scripts": {
     "dev": "concurrently -k -n server,web -c cyan,magenta \"npm:dev:server\" \"npm:dev:web\"",
-    "dev:server": "tsx watch server/index.ts",
+    "dev:server": "tsx watch server/gtm-server.ts",
     "dev:web": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "start": "tsx server/index.ts",
+    "start": "tsx server/gtm-server.ts",
     "test": "tsx --test tests/*.test.ts",
     "test:e2e": "node scripts/e2e-ui.mjs",
     "visual": "node scripts/visual-check.mjs",
     "mock:model": "node scripts/mock-openai.mjs",
-    "check:live": "tsx scripts/live-check.ts"
+    "check:live": "tsx scripts/live-check.ts",
+    "check:model": "tsx scripts/check-model.ts",
+    "start:gtm": "tsx server/gtm-server.ts",
+    "check:gtm-config": "tsx scripts/gtm-check-config.ts",
+    "test:e2e:gtm": "tsx scripts/gtm-p2-e2e.ts",
+    "smoke:gtm-real": "tsx scripts/gtm-real-smoke.ts",
+    "check:release": "tsx scripts/release-safety.ts"
   },
   "engines": {
     "node": ">=20.19"

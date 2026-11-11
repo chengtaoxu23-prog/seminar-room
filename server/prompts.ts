@@ -157,7 +157,11 @@ export function buildHostUser(
     1; /* one call is reserved for the final summary */
   const pendingBlock = pendingUserMessages.length
     ? pendingUserMessages
-        .map((message) => `- id=${message.id}：${clip(message.text, 400)}`)
+        .map((message) => {
+          const completed = session.userResponses?.[message.id]?.completed ?? [];
+          const remaining = ['a', 'b'].filter(actor => !completed.includes(actor as 'a' | 'b'));
+          return `- id=${message.id}：${clip(message.text, 400)}；待回应角色=${remaining.join(',')}；已回应角色=${completed.join(',') || '无'}（不要重复安排已成功者）`;
+        })
         .join('\n')
     : '无';
   return `[主题]

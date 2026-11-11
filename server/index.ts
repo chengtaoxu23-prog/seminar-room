@@ -1,7 +1,14 @@
+import path from 'node:path';
+import { AuditRepository } from './gtm-repository.js';
+import { recoverGtmAudits } from './gtm-engine.js';
 import { config } from './config.js';
 import { SessionStore } from './store.js';
 import { SeminarEngine } from './seminar.js';
 import { createApp } from './routes.js';
+
+// GTM recovery is local-only: no provider is constructed or dispatched at startup.
+const gtmRecovery = await recoverGtmAudits(new AuditRepository(path.join(path.dirname(config.dataDir), 'audits')));
+if (gtmRecovery.manual.length) console.warn(`[gtm-redteam] ${gtmRecovery.manual.length} audit records require manual recovery; no model requests started.`);
 
 const store = new SessionStore(config.dataDir);
 const engine = new SeminarEngine(store);

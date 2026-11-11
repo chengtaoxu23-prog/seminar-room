@@ -80,7 +80,7 @@ function hostDecision(messages: LlmMessage[]): string {
   if (pending.length > 0) {
     return JSON.stringify({
       action: 'invite',
-      participantId: 'a',
+      participantId: prompt.includes('待回应角色=b；') ? 'b' : 'a',
       publicMessage: '用户刚刚提出一个新问题。周证，请你直接回应用户，并说明材料能支持到什么程度。',
       prompt: '直接回应用户插话，引用材料原文，不要继续原定顺序。',
       focus: '直接回应用户',
@@ -424,6 +424,7 @@ test('real orchestration loop: independent role calls, tool use, pause, direct r
     assert.equal(reloaded.messages.length, session.messages.length);
     assert.equal(reloaded.summary.status, 'ready');
   } finally {
+    await engine.waitForIdle();
     await fs.rm(dataDir, { recursive: true, force: true });
   }
 });
@@ -472,6 +473,7 @@ test('user interjection wins over a stale, unexecuted host invitation', async ()
       'no stale participant should run before the user is addressed',
     );
   } finally {
+    await engine.waitForIdle();
     await fs.rm(dataDir, { recursive: true, force: true });
   }
 });
@@ -498,6 +500,7 @@ test('insufficient material: no fabricated citation survives and summary can lea
       'no citation should survive if the quote is not in the material',
     );
   } finally {
+    await engine.waitForIdle();
     await fs.rm(dataDir, { recursive: true, force: true });
   }
 });
@@ -538,6 +541,7 @@ test('API failure is surfaced as error, not as a successful discussion', async (
       'ending must not start new host or participant calls',
     );
   } finally {
+    await engine.waitForIdle();
     await fs.rm(dataDir, { recursive: true, force: true });
   }
 });
