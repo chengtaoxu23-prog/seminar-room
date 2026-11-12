@@ -1,8 +1,12 @@
 # GTM-RedTeam v0.1.0-alpha
 
-**Evidence-backed Adversarial GTM Audit Workbench.** A local workbench for analysts reviewing overseas market-entry plans against the materials they can actually inspect.
+**GTM-RedTeam — Evidence-backed Adversarial GTM Risk Audit**
 
-> **Release status:** Mock workflow engineering-tested. A real OpenAI-compatible adapter is implemented and tested with HTTP stubs; **live model execution has not been tested**. Commercial risk-discovery quality has no formal benchmark. No GPT comparison has been performed. Token estimates are not calibrated to a provider. Local, single-user alpha; TXT, MD and pasted text only. No web research, RAG, PDF or DOCX parsing.
+An evidence-backed adversarial workflow for identifying unsupported assumptions, challenging GTM strategies, and producing traceable commercial risk assessments.
+
+> **Validation status:** Mock engineering tests passed. On 2026-11-12, DeepSeek `deepseek-flash` completed one synthetic five-interview end-to-end smoke: **six real requests, all five business phases, a deterministic Markdown report, and 38,634 actual tokens recorded**. One Verifier truncation was repaired within the eight-call budget. This does not validate real commercial quality. See the [live validation record](docs/validation/deepseek-live-smoke-2026-11-12.md) and the separately preserved [first failed run](docs/deepseek-smoke-2026-11-12.md).
+
+> **Alpha limits:** Local single-user only. TXT, MD and pasted text; no PDF/DOCX import, web research or RAG. No GPT baseline comparison, multi-case Benchmark, real-customer validation or paid-demand evidence. Token estimates are not supplier-calibrated.
 
 **The model proposes. The verifier checks. The server decides. The human reviews.**
 
@@ -34,6 +38,17 @@ The rebuttal verifier is an internal part of stage four, not a sixth business ph
 - Sources and selection are frozen once started. Changing materials requires a new audit. Invalid citations stay out of verified evidence.
 - Unknown CAC, LTV and other operating data must remain unknown. Human decisions and notes are stored separately from machine findings.
 
+## Product and engineering decisions
+
+| Mechanism | Implemented purpose |
+| --- | --- |
+| Citation Integrity / Evidence Traceability | Frozen source ID, revision and paragraph; deterministic quote checks and inspectable original text |
+| Claim Classification | Server derives fact, inference, hypothesis or insufficient evidence from checked citations and semantic review |
+| Prompt Injection Protection | Source and repair payloads are untrusted data; models cannot change schemas, roles, state or tool permissions |
+| Budget Ledger / Finite State Machine | Reserve before dispatch, count repairs/failures, retain fourth-stage capacity, enforce five-phase progression |
+| Human Review | Separate analyst decisions and notes alongside immutable machine findings |
+| Deterministic Report Generation | TypeScript assembles the final report from validated records; model prose cannot replace it |
+
 ## Three screens
 
 These screenshots show **synthetic Mock material and output**, not real commercial audit results.
@@ -52,7 +67,14 @@ See [architecture](docs/architecture/gtm-alpha.md), [API and provider boundaries
 
 ## Install and start
 
-Requirements: Node.js >=20.19 and npm. Windows is the validated desktop environment. Run from the repository root:
+Requirements: Node.js >=20.19 and npm. Windows is the validated desktop environment. The GTM source is on the `codex/gtm-redteam-v0.1` branch; the repository name still reflects its SeminarRoom predecessor.
+
+```sh
+git clone --branch codex/gtm-redteam-v0.1 https://github.com/chengtaoxu23-prog/seminar-room.git gtm-redteam
+cd gtm-redteam
+```
+
+Run from that repository root:
 
 ```sh
 npm ci
@@ -70,16 +92,16 @@ Create an audit, add a clearly labelled synthetic TXT/MD or paste synthetic text
 
 **材料可以保存，不代表一次审计能全部处理。** Default storage is 300,000 Unicode characters, material estimate budget 24,576 tokens, and complete request estimate budget 49,152 tokens. Whole sources are included or excluded. Nothing is silently truncated; every model request is checked again before dispatch.
 
-## Real Provider configuration — not live-validated
+## Real Provider configuration
 
 Copy `.env.example` to `.env.gtm.local`, then edit that file locally. Do not paste keys into the browser, issue tracker or chat. GTM does not load the legacy `.env.local` file or reuse its OpenAI key automatically.
 
 ```dotenv
 GTM_PROVIDER=openai-compatible
-GTM_BASE_URL=https://your-provider.example/v1
-GTM_MODEL=your-model-name
+GTM_BASE_URL=https://api.deepseek.com
+GTM_MODEL=deepseek-flash
 GTM_API_KEY=fill-locally
-GTM_MAX_CALLS=5
+GTM_MAX_CALLS=8
 GTM_TIMEOUT_MS=60000
 ```
 
@@ -91,17 +113,17 @@ npm run check:gtm-config
 
 This validates configuration and constructs the adapter with **zero network calls**. Restart `npm start` to use changed settings. Before starting a real audit, the UI requires informed agreement to send the business description, market, supplementary context and selected sources to the configured supplier.
 
-One request times out after 60 seconds by default. Per-request input estimate is capped at 49,152 tokens. Output caps: Blue 2,048; Red 16,384; Red Verifier 8,192; Blue Rebuttal 12,288; rebuttal Verifier 8,192. The ledger caps real audits at 5 dispatched calls by default, including any repair; configurable maximum is 10. A five-call cap can stop an audit that needs repairs. Estimated limits are not provider-calibrated counts.
+One request times out after 60 seconds by default. Per-request input estimate is capped at 49,152 tokens. Output caps for new runtime audits: Blue 4,096; Red 16,384; Red Verifier 8,192; Blue Rebuttal 12,288; rebuttal Verifier 8,192. The environment template uses eight total calls, including repairs; the omitted-variable runtime default remains five for backward compatibility, and the global maximum is ten. Before the first Blue Rebuttal request, at least four calls must remain: up to two for generation and up to two for semantic verification. A smaller remaining budget stops the audit without dispatching the rebuttal. All registered calls, including failures and pending calls, occupy the same ledger. Estimated limits are not provider-calibrated counts.
 
 ### Approval-gated live smoke test
 
-No live smoke test has been run. After explicit user approval and local configuration only:
+The recorded live smoke has finished. Any additional execution requires fresh explicit authorization and local configuration:
 
 ```sh
-npm run smoke:gtm-real -- --approve-real-smoke
+npm run smoke -- --approve-real-smoke
 ```
 
-This performs one synthetic audit with **at most 5 total dispatched requests, repairs included**. Expected model stages are Blue, Red, Red Verifier, Blue Rebuttal and rebuttal Verifier; stages may be skipped when no eligible evidence exists. Convergence makes no model request. If a repair consumes the cap, the run may fail without a report; it is not silently rerun. The command reports connection/workflow/usage outcomes, not analytical quality. Records and any report stay in ignored `data/`. Running it without the approval flag sends no request. See [provider guide](docs/provider-guide.md) before approving it.
+This performs one synthetic audit with **at most eight total dispatched requests, repairs included**. Expected model stages are Blue, Red, Red Verifier, Blue Rebuttal and rebuttal Verifier; stages may be skipped when no eligible evidence exists. Convergence makes no model request. If a repair consumes the cap, the run may fail without a report; it is not silently rerun. The command reports connection/workflow/usage outcomes, not analytical quality. Records and any report stay in ignored `data/`. Running it without the approval flag sends no request. See [provider guide](docs/provider-guide.md) before approving it.
 
 ## Tests
 
@@ -123,9 +145,17 @@ Never publish `.env*`, runtime data, local logs, cache, backups, ZIP/PATCH artif
 
 ## Limits and roadmap
 
-Implemented: real adapter, own-material input, structured execution, deterministic citation checks/classification, evidence gaps, independent Human Review and export. Mock flow is engineering-validated. Live connectivity, provider-specific JSON behavior and real analytical quality remain unverified. Interruptions use existing recovery behavior; no new automatic recovery is added. Earlier persisted report formats have not been migration-tested.
+Implemented: real adapter, own-material input, structured execution, deterministic citation checks/classification, evidence gaps, independent Human Review and export. Mock engineering coverage and one live synthetic workflow are verified separately. Live invalid-citation and insufficient-evidence branches remain untested; real analytical quality remains unverified. Interruptions use existing recovery behavior; no new automatic recovery is added. Earlier persisted report formats have not been migration-tested. Local data is not encrypted.
 
-Next gates: approved five-request live smoke; analyst usability/utility review; then the preregistered [evaluation plan](docs/evaluation-plan.md). Paid demand, time savings and advantage over direct GPT use are questions, not current product claims. Deployment, broader parsing and collaboration are outside this alpha.
+Future work, in priority order:
+
+1. Validate multiple real commercial-material cases with permission.
+2. Conduct a fair blinded comparison against a single-model GPT baseline.
+3. Measure evidence-support quality and actual human verification time.
+4. Collect real user feedback.
+5. Decide further productization from those results.
+
+See the preregistered [evaluation design](docs/evaluation-plan.md). These are plans, not achieved results. Paid demand, time savings and advantage over direct GPT use remain open questions. Deployment, broader parsing and collaboration are outside this alpha.
 
 ## License
 
@@ -133,4 +163,4 @@ Next gates: approved five-request live smoke; analyst usability/utility review; 
 
 ## 中文简介
 
-GTM-RedTeam 是面向出海咨询分析师的证据型 GTM 审计工作台。它用固定五阶段、原文核验、独立语义审查、服务端分类和人工复核，让商业质询能够回到材料，或明确标注证据不足。当前为本地单用户 Alpha；Mock 已完成工程验证，真实接口仅完成代码与 stub 测试，尚未进行真实模型冒烟，也未证明优于直接使用 GPT。
+GTM-RedTeam 是面向出海咨询分析师的证据型 GTM 审计工作台。它用固定五阶段、原文核验、独立语义审查、服务端分类和人工复核，让商业质询能够回到材料，或明确标注证据不足。当前为本地单用户 Alpha；Mock 已完成工程验证，DeepSeek 已用一个合成案例完成真实端到端冒烟（六请求、实际 38,634 Token），但真实商业质量、GPT 对比、多案例评测与付费意愿尚未验证。

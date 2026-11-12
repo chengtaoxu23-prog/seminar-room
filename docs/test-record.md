@@ -426,3 +426,11 @@ UI提示由React服务端渲染断言检查；本轮没有在浏览器中手动�
 - Runtime limits and usage remain in the existing ledger. No silent real-to-Mock fallback; real start requires informed consent. Config/model identity is public, key is server-only.
 - Current and fetched history text scan: no non-allowlisted sensitive-pattern findings; explicit synthetic test credentials allowlisted by location and marker. Screenshots reviewed as synthetic/historical fixtures. No ZIP/PATCH/backup is selected for publication. Local runtime data and artifacts remain ignored.
 - MIT retained; installed dependency license metadata reviewed. No deployment, merge, tag, release or Push performed. Local commit and final manifests are reported separately so no self-referential hash is stored here.
+
+
+## 2026-11-12 final GTM source publication checks
+
+- Live evidence reused only: [separate DeepSeek smoke validation](validation/deepseek-live-smoke-2026-11-12.md). No live model calls during final publication. First failed run is preserved unchanged.
+- This publication run: npm test passed all 153 reported nodes, comprising 152 independent leaf tests and one parent container; seven P1-C tests included. Typecheck and build passed. API/runtime/legacy regression and real-adapter HTTP-stub tests remained distinct from live results. No assertions changed in this publication task.
+- Clean independent candidate: npm ci, build, npm start on loopback 4317, actual page opening and offline Mock browser E2E (including upload, evidence, Human Review, export, refresh and cancel) passed. No filled environment or runtime data copied. npm reported 0 known vulnerabilities; its esbuild postinstall allowScripts warning remained, and no extra script approval was applied.
+- MIT and third-party notices retained; no new dependency added. Current/history pattern scans, staged path/diff review and separate image/provenance review apply; they are not a proof that every possible sensitive item is absent. Ignored outputs/runtime data remain local.

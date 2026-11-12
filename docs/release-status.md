@@ -1,3 +1,5 @@
+> Historical SeminarRoom status from 2026-11-07. Current GTM alpha: [README](../README.md), [release notes](release-notes-v0.1.0-alpha.md), [live validation](validation/deepseek-live-smoke-2026-11-12.md). The dated record below is retained for provenance.
+
 # 公开实验版状态与独立复验
 
 日期：2026-11-07（Asia/Shanghai）。发布定位：本地运行的开源实验原型。
