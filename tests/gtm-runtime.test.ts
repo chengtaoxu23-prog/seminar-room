@@ -25,7 +25,8 @@ async function service(failure?:'http'|'schema'|'invalid_json'){
   const response=await mock.complete({stage:actualStage,messages:body.messages,maxOutputTokens:body.max_tokens,tools:[]} as GtmRequest,new AbortController().signal);
   return new Response(JSON.stringify({model:'stub-returned-model',choices:[{finish_reason:'stop',message:{content:failure==='schema'?'{}':response.content}}],usage:{prompt_tokens:10,completion_tokens:5,total_tokens:15}}),{status:200});
  };
- const configured=configureGtmRuntime(syntheticEnv,send),repo=new AuditRepository(dir),s=createGtmApp(repo,configured.config,0,configured.runtime);await s.init();
+ // Transport fixture uses the P1-C candidate budget; default-five validation above remains unchanged.
+ const configured=configureGtmRuntime({...syntheticEnv,GTM_MAX_CALLS:'8'},send),repo=new AuditRepository(dir),s=createGtmApp(repo,configured.config,0,configured.runtime);await s.init();
  const server=s.app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));const port=(server.address() as {port:number}).port;
  const api=async(url:string,method='GET',body?:unknown)=>{const response=await fetch(`http://127.0.0.1:${port}/api/gtm`+url,{method,headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});return {status:response.status,data:await response.json()};};
  const created=await api('/audits','POST',{businessBrief:'Synthetic adapter validation — not real market research.'});const id=created.data.audit.id;

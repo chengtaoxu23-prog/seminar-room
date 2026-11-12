@@ -126,3 +126,7 @@ export function settleRequest(ledger:RequestLedger,id:string,outcome:CallOutcome
   const calls=structuredClone(ledger.calls);calls[index]=updated;
   const result={calls,usage:summarizeUsage(calls)};validateRequestLedger(result,config);return result;
 }
+
+/** Uses the existing ledger only; already registered requests are never refunded. */
+export function requestBudgetRemaining(a:import('../src/shared/gtm.js').AuditRun):number{return a.configSnapshot.requests.maxCalls-a.ledger.calls.length;}
+export function rebuttalReserveRequired(a:import('../src/shared/gtm.js').AuditRun):number{return (a.configSnapshot.requests.maxPerStage-a.ledger.calls.filter(c=>c.stage==='blue_rebuttal').length)+(a.configSnapshot.requests.maxPerStage-a.ledger.calls.filter(c=>c.stage==='rebuttal_verifier').length);}

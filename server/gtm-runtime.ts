@@ -8,7 +8,7 @@ export function configureGtmRuntime(env:Record<string,string|undefined>,send:typ
  const mode=env.GTM_PROVIDER??'mock';
  if(mode!=='mock'&&mode!=='openai-compatible')throw Error('invalid_gtm_provider');
  const integer=(name:string,fallback:number,max:number)=>{const raw=env[name];if(raw!==undefined&&!/^\d+$/.test(raw))throw Error('invalid_gtm_limits');const n=raw===undefined?fallback:Number(raw);if(!Number.isSafeInteger(n)||n<1||n>max)throw Error('invalid_gtm_limits');return n;};
- const config=createGtmConfig({requests:{maxCalls:integer('GTM_MAX_CALLS',mode==='mock'?10:5,10)}});
+ const config=createGtmConfig({requests:{maxCalls:integer('GTM_MAX_CALLS',mode==='mock'?10:5,10),outputTokens:{blue_proposal:4096}}});
  if(mode==='mock')return {config,runtime:{mode:'mock',model:'MOCK-synthetic-only',provider:createGtmMockProvider()} satisfies RuntimeProvider};
  const key=env.GTM_API_KEY,model=env.GTM_MODEL,base=env.GTM_BASE_URL;
  if(!key?.trim()||!model?.trim()||!base?.trim())throw Error('gtm_real_configuration_required');

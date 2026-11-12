@@ -2,7 +2,7 @@ import {createHash} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import type {AuditRun,AuditPosition,AuditExecution,ModelStage,ModelOutput,JsonValue,ModelCheckpoint,BlueProposal,RedChallenge,BlueRebuttal,SemanticReview,VerifiedClaim,VerifiedChallenge,VerifiedRebuttal} from '../src/shared/gtm.js';
 import {AuditRepository,AuditRecoveryRequiredError} from './gtm-repository.js';
-import {settleRequest,estimateRequestTokens} from './gtm-budget.js';
+import {settleRequest,estimateRequestTokens,requestBudgetRemaining,rebuttalReserveRequired} from './gtm-budget.js';
 import {transitionAuditState} from './gtm-state.js';
 import {buildGtmRequest} from './gtm-prompts.js';
 import type {GtmProvider,GtmResponse} from './gtm-provider.js';
@@ -20,6 +20,13 @@ function blueReviewInput(a:AuditRun,findings:VerifiedChallenge[]){
 const checkpoint=(a:AuditRun,s:ModelStage)=>a.execution?.checkpoints[s];
 const output=<T extends ModelOutput>(a:AuditRun,s:ModelStage):T=>{const value=checkpoint(a,s)?.output;if(!value)throw new EngineFailure('missing_phase_output',s);return value as T;};
 const stripCitations=(value:unknown):unknown=>Array.isArray(value)?value.map(stripCitations):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).filter(([k])=>k!=='citations').map(([k,v])=>[k,stripCitations(v)])):value;
+export function failureDetails(a:AuditRun){
+ const error=a.execution?.lastError;if(!error)return null;
+ const raw=error.code,semantic=error.stage==='red_verifier'||error.stage==='rebuttal_verifier';
+ const code=raw==='timeout'?'provider_timeout':['http_error','network_error','invalid_response'].includes(raw)?'provider_error':raw==='invalid_structure'?(semantic?'semantic_verification_failed':'invalid_structured_output'):raw==='citation_repair_changed_claims'?'citation_validation_failed':raw;
+ const used=a.ledger.calls.length,total=a.configSnapshot.requests.maxCalls,remaining=requestBudgetRemaining(a),requiredReserve=code==='budget_exhausted'&&a.state.phase==='blue_rebuttal'&&!a.ledger.calls.some(c=>c.stage==='blue_rebuttal')?rebuttalReserveRequired(a):null;
+ return {code,rawCode:raw,phase:a.state.phase,substate:a.state.substate,used,total,remaining,requiredReserve,reportGenerated:!!a.execution?.report,message:requiredReserve!==null?`Budget exhausted at Blue Rebuttal preflight. Required reserve: ${requiredReserve}; remaining: ${remaining}. No additional request dispatched.`:code};
+}
 export async function recoverGtmAudits(repo:AuditRepository):Promise<{paused:number;interrupted:number;manual:string[]}>{
  await repo.init();const summary={paused:0,interrupted:0,manual:[] as string[]};
  for(const id of await repo.ids()){
@@ -43,7 +50,7 @@ export class GtmAuditEngine{
  private readonly running=new Map<string,Promise<AuditRun>>();private readonly controllers=new Map<string,AbortController>();private initialization:Promise<unknown>|null=null;
  constructor(readonly repository:AuditRepository,private readonly provider:GtmProvider){}
  init():Promise<unknown>{return this.initialization??=recoverGtmAudits(this.repository);}
- async view(id:string){const {audit,recovery}=await this.repository.load(id);return {audit,recovery,capacityNotice:'30万字符是存储容量，不代表全部能进入一次审计。',materialBudget:audit.configSnapshot.capacity.materialEstimatedTokens,materialEstimatedTokens:audit.selection.estimatedMaterialTokens,materialBudgetRatio:audit.selection.estimatedMaterialTokens/audit.configSnapshot.capacity.materialEstimatedTokens,requestInputBudget:audit.configSnapshot.capacity.requestEstimatedInputTokens,latestRequestEstimate:audit.execution?.lastError?.estimatedInputTokens??audit.ledger.calls.at(-1)?.estimatedInputTokens??null,overLimitReason:!audit.selection.withinBudget?'选定完整来源超出估算预算，请取消部分来源或自行整理为独立TXT/MD。':audit.execution?.lastError?.code==='context_budget_exceeded'?'完整模型请求超出输入估算预算；原文未被删减。':audit.execution?.lastError?.code==='context_limit'?'供应商拒绝了上下文长度；原文未被删减。':null};}
+ async view(id:string){const {audit,recovery}=await this.repository.load(id);return {audit,recovery,failure:failureDetails(audit),capacityNotice:'30万字符是存储容量，不代表全部能进入一次审计。',materialBudget:audit.configSnapshot.capacity.materialEstimatedTokens,materialEstimatedTokens:audit.selection.estimatedMaterialTokens,materialBudgetRatio:audit.selection.estimatedMaterialTokens/audit.configSnapshot.capacity.materialEstimatedTokens,requestInputBudget:audit.configSnapshot.capacity.requestEstimatedInputTokens,latestRequestEstimate:audit.execution?.lastError?.estimatedInputTokens??audit.ledger.calls.at(-1)?.estimatedInputTokens??null,overLimitReason:!audit.selection.withinBudget?'选定完整来源超出估算预算，请取消部分来源或自行整理为独立TXT/MD。':audit.execution?.lastError?.code==='context_budget_exceeded'?'完整模型请求超出输入估算预算；原文未被删减。':audit.execution?.lastError?.code==='context_limit'?'供应商拒绝了上下文长度；原文未被删减。':null};}
  async pause(id:string):Promise<AuditRun>{return this.repository.update(id,a=>{a.state=transitionAuditState(a.state,{type:'pause'});});}
  async cancel(id:string):Promise<AuditRun>{const a=await this.repository.update(id,v=>{v.state=transitionAuditState(v.state,{type:'cancel'});});this.controllers.get(id)?.abort();return a;}
  async start(id:string,background=false):Promise<AuditRun>{await this.init();if(this.running.has(id)){if(background)throw new EngineFailure('already_started');return this.running.get(id)!;}const loaded=await this.repository.load(id);if(loaded.recovery!=='none')throw new AuditRecoveryRequiredError();if(loaded.audit.state.lifecycle==='completed'){if(background)throw new EngineFailure('already_started');return loaded.audit;}if(loaded.audit.state.lifecycle!=='draft')throw new EngineFailure('explicit_resume_required');const started=await this.repository.update(id,a=>{if(a.state.lifecycle!=='draft')throw new EngineFailure('already_started');a.execution??=emptyExecution();a.state=transitionAuditState(a.state,{type:'start'});});const task=this.launch(id);if(background){void task.catch(()=>undefined);return started;}return task;}
@@ -67,6 +74,7 @@ export class GtmAuditEngine{
    const baseInput=cp.inputSnapshot&&typeof cp.inputSnapshot==='object'&&!Array.isArray(cp.inputSnapshot)&&Object.keys(cp.inputSnapshot).length===0?data:cp.inputSnapshot;
    const request=buildGtmRequest(stage,baseInput,a,count?{code:reason,previous:json(previous),citationOnly,...(citationOnly?{issues:json(a.execution!.integrity.filter(v=>v.stage===stage).at(-1)?.failures??[])}:{})}:undefined);
    const estimatedInputTokens=estimateRequestTokens(request,a.configSnapshot);if(estimatedInputTokens>a.configSnapshot.capacity.requestEstimatedInputTokens)throw new EngineFailure('context_budget_exceeded',stage,{estimatedInputTokens,budgetLimit:a.configSnapshot.capacity.requestEstimatedInputTokens});
+   if(requestBudgetRemaining(a)<1)throw new EngineFailure('budget_exhausted',stage);
    const reservation=await this.repository.reserve(id,a.recordRevision,{commandId:`${id}:${stage}:${count+1}`,stage,configuredModel:this.provider.configuredModel,estimatedInputTokens,...(count?{repairReason:citationOnly?'citation' as const:reason==='output_truncated'?'truncated' as const:reason==='provider_result_unknown'?'transport' as const:'structure' as const}:{})});
    if(!reservation.isNew)throw new EngineFailure('duplicate_dispatch_blocked',stage);
    const call=reservation.call,started=Date.now();let response:GtmResponse|undefined,parsed:ModelOutput|null=null,code:string|null=null,failedHttpStatus:number|null=null;
@@ -123,6 +131,7 @@ export class GtmAuditEngine{
     if(state.substate==='verified'){await this.move(id,{phase:'convergence',substate:'assembling'});continue;}
     const findings=e.findings!,expected=findings.map(f=>f.challenge.id);
     if(state.substate==='generating'||state.substate==='blue_repairing'){
+     if(expected.length&&!a.ledger.calls.some(c=>c.stage==='blue_rebuttal')&&requestBudgetRemaining(a)<rebuttalReserveRequired(a))throw new EngineFailure('budget_exhausted','blue_rebuttal');
      if(!expected.length){await this.skip(id,'blue_rebuttal',json({challengeIds:[]}));await this.move(id,{phase:'blue_rebuttal',substate:'citation_check'});continue;}
      if(!await this.generate(id,'blue_rebuttal',json(blueReviewInput(a,findings)),signal,expected))continue;await this.move(id,{phase:'blue_rebuttal',substate:'citation_check'});continue;
     }

@@ -21,7 +21,8 @@
     "check:gtm-config": "tsx scripts/gtm-check-config.ts",
     "test:e2e:gtm": "tsx scripts/gtm-p2-e2e.ts",
     "smoke:gtm-real": "tsx scripts/gtm-real-smoke.ts",
-    "check:release": "tsx scripts/release-safety.ts"
+    "check:release": "tsx scripts/release-safety.ts",
+    "smoke": "tsx scripts/gtm-real-smoke.ts"
   },
   "engines": {
     "node": ">=20.19"
