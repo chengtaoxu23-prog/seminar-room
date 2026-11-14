@@ -1,3 +1,4 @@
+import GtmResearch from './GtmResearch';
 import { useEffect, useRef, useState } from "react";
 import type { GtmConfig } from "../src/shared/gtm";
 import GtmCreate from "./GtmCreate";
@@ -22,6 +23,7 @@ import "./gtm.css";
 const navigation = [
   ["home", "grid", "项目总览"],
   ["projects", "folder", "审计项目"],
+  ["hypotheses", "shield", "假设研究"],
   ["sources", "source", "材料来源"],
   ["reports", "report", "审计报告"],
   ["evaluations", "chart", "评测案例"],
@@ -236,7 +238,7 @@ export default function GtmApp() {
           <div>
             Local Workspace<small>本地单用户工作空间</small>
           </div>
-          <Badge>v0.2</Badge>
+          <Badge>v0.3</Badge>
         </div>
         <span className="nav-label">WORKSPACE</span>
         <nav aria-label="主导航">
@@ -672,6 +674,7 @@ export default function GtmApp() {
               )}
             </>
           )}
+          {screen === "hypotheses" && <GtmResearch/>}
           {screen === "evaluations" && (
             <>
               <div className="page-title">
@@ -894,7 +897,7 @@ export default function GtmApp() {
         </main>
         <footer className="workspace-footer">
           <span>
-            GTM-RedTeam <b>v0.2 Beta</b>
+            GTM-RedTeam <b>v0.3 Alpha</b>
           </span>
           <span>本地工作空间 · Evidence-backed research</span>
         </footer>

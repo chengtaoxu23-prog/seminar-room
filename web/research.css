@@ -1,0 +1,118 @@
+.gtm .research-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.gtm .research-grid {
+  display: grid;
+  grid-template-columns: 285px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.gtm .research-board {
+  position: sticky;
+  top: 18px;
+  max-height: 85vh;
+  overflow: auto;
+}
+.gtm .research-item {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 15px 18px;
+  align-items: flex-start;
+  text-align: left;
+  border: 0;
+  border-top: 1px solid var(--gtm-border);
+  border-radius: 0;
+  gap: 8px;
+  background: transparent;
+}
+.gtm .research-item.selected,
+.gtm .research-tabs .selected {
+  background: var(--gtm-accent-soft);
+  color: var(--gtm-accent);
+}
+.gtm .research-item b {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.gtm .research-item span {
+  font-size: 10px;
+}
+.gtm .research-detail {
+  min-width: 0;
+}
+.gtm .research-tabs {
+  display: flex;
+  gap: 8px;
+  overflow: auto;
+  border-bottom: 1px solid var(--gtm-border);
+  padding-bottom: 15px;
+  margin-bottom: 22px;
+}
+.gtm .research-tabs button {
+  font-size: 10px;
+  white-space: nowrap;
+}
+.gtm .research blockquote {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-left: 2px solid #93a9cf;
+  margin: 15px 0;
+  padding-left: 14px;
+  color: #546d92;
+}
+.gtm .research .claim small,
+.gtm .research .muted {
+  overflow-wrap: anywhere;
+}
+.gtm .research hr {
+  border: 0;
+  border-top: 1px solid var(--gtm-border);
+  margin: 25px 0;
+}
+.gtm .research-detail > h3 {
+  margin-top: 22px;
+}
+.gtm .research .claim {
+  margin-top: 15px;
+}
+.gtm .research .claim .sectionline {
+  flex-wrap: wrap;
+}
+@media (max-width: 1000px) {
+  .gtm .research-grid {
+    grid-template-columns: 1fr;
+  }
+  .gtm .research-board {
+    position: static;
+    max-height: 320px;
+  }
+  .gtm .research-detail {
+    padding: 20px;
+  }
+  .gtm .research-actions button,
+  .gtm .research-actions a {
+    font-size: 11px;
+  }
+}
+@media (max-width: 680px) {
+  .gtm .research .page-title {
+    flex-direction: column;
+  }
+  .gtm .research .page-title > .badge {
+    margin-top: 0;
+  }
+  .gtm .research .sectionline {
+    flex-wrap: wrap;
+  }
+  .gtm .research .research-actions {
+    gap: 8px;
+  }
+  .gtm .research-detail {
+    padding: 17px 13px;
+  }
+}

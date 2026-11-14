@@ -1,7 +1,7 @@
 import type {ModelStage} from '../src/shared/gtm.js';
 import type {TokenUsage} from '../src/shared/types.js';
 import {providerOptions} from './provider.js';
-export interface GtmRequest {stage:ModelStage;messages:{role:'system'|'user';content:string}[];maxOutputTokens:number;tools:readonly never[]}
+export interface GtmRequest {stage:ModelStage;messages:{role:'system'|'user';content:string}[];maxOutputTokens:number;tools:readonly never[];thinking?:{type:'disabled'}}
 export interface GtmResponse {content:string;finishReason:string;returnedModel:string|null;usage:TokenUsage;httpStatus:number;toolCalls?:unknown[]}
 export interface GtmProvider {configuredModel:string;complete(request:GtmRequest,signal:AbortSignal):Promise<GtmResponse>;sanitize?:(text:string)=>{text:string;blocked:boolean}}
 export class GtmProviderError extends Error{constructor(readonly code:string,readonly httpStatus:number|null=null){super(code);this.name='GtmProviderError';}}
@@ -13,7 +13,7 @@ export function createGtmHttpProvider(connection:{baseUrl:string;model:string;ap
  return {configuredModel:connection.model,sanitize,async complete(request,signal){
   const controller=new AbortController(),abort=()=>controller.abort();if(signal.aborted)throw new GtmProviderError('aborted');signal.addEventListener('abort',abort,{once:true});const timer=setTimeout(abort,connection.timeoutMs??60000);
   try{
-   const response=await send(endpoint,{method:'POST',redirect:'error',headers:{'Content-Type':'application/json',Authorization:`Bearer ${connection.apiKey}`},body:JSON.stringify({model:connection.model,messages:request.messages,max_tokens:request.maxOutputTokens,stream:false,response_format:{type:'json_object'},...providerOptions(connection.baseUrl,connection.model)}),signal:controller.signal});
+   const response=await send(endpoint,{method:'POST',redirect:'error',headers:{'Content-Type':'application/json',Authorization:`Bearer ${connection.apiKey}`},body:JSON.stringify({model:connection.model,messages:request.messages,max_tokens:request.maxOutputTokens,stream:false,response_format:{type:'json_object'},...providerOptions(connection.baseUrl,connection.model),...(request.thinking?{thinking:request.thinking}:{})}),signal:controller.signal});
    if(!response.ok){const body=await response.text();throw new GtmProviderError(/context.*(length|limit|window)|maximum context|too many tokens/i.test(body)?'context_limit':'http_error',response.status);}
    const data=await response.json().catch(()=>{throw new GtmProviderError('invalid_response',response.status);}) as {model?:unknown;usage?:Record<string,unknown>;choices?:{finish_reason?:string;message?:{content?:unknown;tool_calls?:unknown[]}}[]};const choice=data.choices?.[0];
    if(!choice?.message||typeof choice.message.content!=='string')throw new GtmProviderError('invalid_response',response.status);

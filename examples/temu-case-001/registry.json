@@ -1,0 +1,32 @@
+{
+  "caseId": "Case 001",
+  "T0": "2023-06-30",
+  "T1": "2024-09-13",
+  "checkedAt": "2026-11-14",
+  "sources": [
+    {
+      "id": "temu-t0-committee",
+      "title": "US House Select Committee — interim findings (excerpt)",
+      "publishedAt": "2023-06-22",
+      "url": "https://chinaselectcommittee.house.gov/media/press-releases/select-committee-releases-interim-findings-shein-temu-forced-labor",
+      "locator": "Key Finding 2; Key Finding 3",
+      "raw": "relies on the de minimis provision\n\nTemu conducts no audits and reports no compliance system",
+      "note": "Attribution: committee preliminary findings, not independently established facts. Short excerpts only."
+    },
+    {
+      "id": "temu-t1-whitehouse",
+      "title": "Archived White House — proposed de minimis action (excerpt)",
+      "publishedAt": "2024-09-13",
+      "url": "https://bidenwhitehouse.archives.gov/briefing-room/statements-releases/2024/09/13/fact-sheet-biden-harris-administration-announces-new-actions-to-protect-american-consumers-workers-and-businesses-by-cracking-down-on-de-minimis-shipments-with-unsafe-unfairly-traded-products/",
+      "locator": "Administration Action Intended to Reduce De Minimis Import Volumes — New Rulemaking",
+      "raw": "The Administration intends to issue a Notice of Proposed Rulemaking",
+      "note": "Proposal as of T1, not an enacted change. No later policy outcomes included."
+    }
+  ],
+  "hypotheses": [
+    "H-001：低价值直邮制度是否构成关键成本依赖？",
+    "H-002：供应链合规问题是否影响扩张可持续性？",
+    "H-003：公开资料是否足以判断 Temu 美国业务的单位经济性？"
+  ],
+  "limitations": "Only two primary-source excerpts. No CAC, LTV, margins or operating outcomes. All automated semantic/transition demonstrations are MOCK / SYNTHETIC and do not establish Temu findings."
+}

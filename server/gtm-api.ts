@@ -1,3 +1,7 @@
+import {mountResearchApi} from './research-api.js';
+import path from 'node:path';
+import {mountWorkspaceApi} from './workspace-api.js';
+import {WorkspaceRepository} from './workspace-repository.js';
 import express,{type Request,type Response,type NextFunction} from 'express';
 import {randomUUID} from 'node:crypto';
 import type {AuditRun,GtmConfig,HumanReview} from '../src/shared/gtm.js';
@@ -17,7 +21,8 @@ export function createGtmApp(repository=new AuditRepository(),configuration:GtmC
  const identity:ProviderIdentity=runtime?{mode:runtime.mode,model:runtime.model}:{mode:'mock',model:'MOCK-synthetic-only'};
  const identityFor=(a:AuditRun):ProviderIdentity=>a.providerSnapshot??{mode:'mock',model:a.ledger.calls[0]?.configuredModel??'MOCK-synthetic-only'};
  const engine=new GtmAuditEngine(repository,runtime?.provider??createGtmMockProvider(delayMs));
- const app=express();app.disable('x-powered-by');app.use(express.json({limit:'2mb'}));
+ const app=express();app.disable('x-powered-by');app.use('/api/gtm/workspace',express.json({limit:'28mb'}));app.use(express.json({limit:'2mb'}));
+ app.use('/api/gtm',(req,res,next)=>{if(!/^(127\.0\.0\.1|localhost|\[::1\])(?::\d{1,5})?$/.test(req.headers.host??'')){res.status(403).json({code:'invalid_host',error:'仅允许本机地址访问研究 API。'});return;}if(req.headers.origin&&req.headers.origin!==`${req.protocol}://${req.headers.host}`){res.status(403).json({code:'invalid_origin',error:'不接受跨来源研究操作。'});return;}next();});
  app.use((_req,res,next)=>{res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');next();});
  const route=(fn:(req:Request,res:Response)=>Promise<void>)=>(req:Request,res:Response,next:NextFunction)=>{fn(req,res).catch(next);};
  const load=async(id:string)=>(await repository.load(id)).audit;
@@ -61,10 +66,12 @@ export function createGtmApp(repository=new AuditRepository(),configuration:GtmC
   if(req.query.format!==undefined&&req.query.format!=='md')throw new ApiFailure(400,'invalid_format','仅支持 Markdown。');
   if(req.query.format==='md'){res.setHeader('Content-Disposition',`attachment; filename="audit-${a.id}.md"`);res.type('text/markdown').send(markdown);}else res.json({report:a.execution.report,humanReviews:a.humanReviews??[],markdown});
  }));
+ const research=mountResearchApi(app,repository,engine,identity.mode);
+ const workspace=mountWorkspaceApi(app,new WorkspaceRepository(path.join(repository.dir,'workspace')),research,runtime);
  app.use('/api/gtm',(_req,res)=>res.status(404).json({code:'not_found',error:'接口不存在。'}));
  app.use((error:unknown,_req:Request,res:Response,_next:NextFunction)=>{
-  const e=error as NodeJS.ErrnoException;const status=error instanceof ApiFailure?error.status:error instanceof SchemaError||error instanceof SyntaxError?400:(e as Error).message==='already_started'?409:e.code==='ENOENT'?404:500;
-  res.status(status).json({code:error instanceof ApiFailure?error.code:status===400?'invalid_input':status===404?'not_found':'request_failed',error:(e as Error).message==='already_started'?'该审计已经启动，不能重复启动。':error instanceof ApiFailure||error instanceof SchemaError?e.message:status===404?'审计不存在。':'请求失败；请检查审计状态或本地存储。'});
+  const e=error as NodeJS.ErrnoException,tooLarge=(error as {type?:string}).type==='entity.too.large';const status=tooLarge?413:error instanceof ApiFailure?error.status:error instanceof SchemaError||error instanceof SyntaxError?400:(e as Error).message==='already_started'?409:e.code==='ENOENT'?404:500;
+  res.status(status).json({code:tooLarge?'upload_too_large':error instanceof ApiFailure?error.code:status===400?'invalid_input':status===404?'not_found':'request_failed',error:tooLarge?'请求超过上传容量限制；单文件上限 20 MB。':(e as Error).message==='already_started'?'该审计已经启动，不能重复启动。':error instanceof ApiFailure||error instanceof SchemaError?e.message:status===404?'审计不存在。':'请求失败；请检查审计状态或本地存储。'});
  });
- return {app,engine,repository,view,init:()=>engine.init()};
+ return {app,engine,repository,view,workspace,init:async()=>{await engine.init();await workspace.init();}};
 }
