@@ -1,173 +1,297 @@
-# GTM-RedTeam v0.2.0-beta.1
+# GTM-RedTeam
 
-**GTM-RedTeam — Evidence-backed Adversarial GTM Risk Audit**
+### Evidence-backed Adversarial GTM Audit Workspace
 
-An evidence-backed adversarial workflow for identifying unsupported assumptions, challenging GTM strategies, and producing traceable commercial risk assessments.
+**Make commercial assumptions inspectable. Make evidence traceable. Make unsupported reasoning visible.**
 
-> **Validation status:** 153 automated tests and two isolated Mock browser suites passed. On 2026-11-14, DeepSeek `deepseek-flash` completed a new synthetic audit in **five real requests / 22,873 actual tokens**, followed by successful UI review, report export and reload checks. See the [v0.2 live acceptance record](docs/validation/v02-beta-live-2026-11-14.md). This verifies the workflow, not real commercial quality. The [earlier live validation](docs/validation/deepseek-live-smoke-2026-11-12.md) is retained separately.
+GTM-RedTeam is an evidence-first, adversarial AI workflow for auditing go-to-market (GTM) strategies. It combines structured, role-based adversarial reasoning, deterministic citation validation, semantic evidence review, and reproducible report generation.
 
-> **Beta limits:** Local single-user only. TXT, MD and pasted text; no PDF/DOCX import, web research or RAG. No GPT baseline comparison, multi-case Benchmark, real-customer validation or paid-demand evidence. Token estimates are not supplier-calibrated.
+Commercial arguments pass through a controlled sequence of proposal, challenge, verification, rebuttal, and report assembly. The current implementation uses fixed Blue/Red/Verifier roles with the configured provider; independent cross-model collaboration is not an implemented capability.
 
-**The model proposes. The verifier checks. The server decides. The human reviews.**
+> The goal is not to build a smarter chatbot. It is to build a more auditable reasoning workflow.
 
-## Why this exists
+---
 
-Consulting analysts, international PMMs, strategy teams and early-stage investment analysts need to distinguish commercial facts from plausible stories. A fluent model answer may contain an invented quote, a real quote that does not support the conclusion, or fabricated CAC/LTV figures. Rechecking those claims is part of the work.
+## Why GTM-RedTeam?
 
-GTM-RedTeam structures that review: an initial GTM proposal, independent challenges, source checks, one rebuttal, and a deterministic report. It aims to make the evidence chain inspectable. It does not certify that a commercial risk is objectively true or claim better analysis than a general-purpose LLM.
+General-purpose LLMs can generate persuasive commercial analysis while leaving important questions unanswered:
 
-## Workflow
+- Does the cited material actually exist?
+- Does the source support the associated claim?
+- Is the conclusion a fact, an inference, or an untested hypothesis?
+- What happens when the opposing argument cannot be supported?
+- Can another reviewer trace the reasoning back to the original material?
+
+GTM-RedTeam addresses these problems through explicit evidence protocols and controlled execution.
+
+## Core Architecture
+
+### 1. Adversarial reasoning workflow
 
 ```mermaid
 flowchart LR
-  A[Blue Proposal] --> B[Red Challenge]
-  B --> C[Verifier: citation integrity and semantic review]
-  C --> D[Blue Rebuttal: one round, with evidence review]
-  D --> E[Deterministic Convergence]
-  E --> F[Human Review and Markdown export]
+    A[Commercial Materials] --> B[Blue Proposal]
+    B --> C[Red Challenge]
+    C --> D[Verifier]
+    D --> E[Blue Rebuttal]
+    E --> F[Deterministic Report]
+    D --> G[Citation Integrity]
+    D --> H[Semantic Support Review]
+    G --> D
+    H --> D
 ```
 
-The rebuttal verifier is an internal part of stage four, not a sixth business phase. No second Blue/Red round is run. Zero supported risks is a valid result.
+Five controlled stages:
 
-## Evidence and decisions
+| Stage | Responsibility |
+|---|---|
+| Blue Proposal | Develop a structured GTM proposal and identify commercial assumptions |
+| Red Challenge | Challenge assumptions, identify risks and unsupported reasoning |
+| Verifier | Check citation integrity and assess semantic support |
+| Blue Rebuttal | Respond to challenges using available evidence |
+| Deterministic Convergence | Assemble the final report using server-side TypeScript logic |
 
-- Each quote identifies a Source ID, material revision hash and paragraph ID.
-- A deterministic continuous-substring check runs before narrowly defined normalization. Numeric, currency and unit meaning must be preserved.
-- Semantic review separately judges whether evidence supports the claim and its reasoning. Quote existence alone proves neither relevance nor commercial risk.
-- The server derives `material_fact`, `inference`, `hypothesis` or `insufficient_evidence`; model-supplied labels cannot override it.
-- Sources and selection are frozen once started. Changing materials requires a new audit. Invalid citations stay out of verified evidence.
-- Unknown CAC, LTV and other operating data must remain unknown. Human decisions and notes are stored separately from machine findings.
+### 2. Two-layer evidence verification
 
-## Product and engineering decisions
+**Layer 1 — Citation Integrity**
 
-| Mechanism | Implemented purpose |
-| --- | --- |
-| Citation Integrity / Evidence Traceability | Frozen source ID, revision and paragraph; deterministic quote checks and inspectable original text |
-| Claim Classification | Server derives fact, inference, hypothesis or insufficient evidence from checked citations and semantic review |
-| Prompt Injection Protection | Source and repair payloads are untrusted data; models cannot change schemas, roles, state or tool permissions |
-| Budget Ledger / Finite State Machine | Reserve before dispatch, count repairs/failures, retain fourth-stage capacity, enforce five-phase progression |
-| Human Review | Separate analyst decisions and notes alongside immutable machine findings |
-| Deterministic Report Generation | TypeScript assembles the final report from validated records; model prose cannot replace it |
+- Check continuous original substrings first, followed only by the fixed citation normalization rules.
+- Preserve source IDs, paragraph IDs, and material revisions.
+- Reject unsupported or fabricated citations.
+- Keep source provenance inspectable.
 
-## v0.2 workspace
+**Layer 2 — Semantic Support Review**
 
-Project Hub now manages actual audit records rather than opening a large form. A four-step setup leads into a split-pane Audit Workspace with selectable risks, source evidence, Blue rebuttals and separate Human Review. Report Center renders a structured nine-section deliverable with Markdown export.
+- Assess whether the cited material supports the associated claim.
+- Distinguish direct statements from inference and hypotheses.
+- Preserve insufficient evidence instead of manufacturing certainty.
+- Keep semantic judgments distinguishable from deterministic validation results.
 
-Desktop, tablet and mobile layouts have been checked. PDF import/export, project editing/archiving and evaluation management remain Planned. See [UI architecture and boundaries](docs/architecture/gtm-v02-ui.md).
+A valid citation does not automatically establish a valid argument.
 
-## Three screens
+### 3. Structured Claim Classification
 
-These screenshots show **synthetic Mock material and output**, not real commercial audit results.
+Claims are organized into four categories:
+
+| Classification | Meaning |
+|---|---|
+| `material_fact` | Classified as directly stated in the cited material; source truth is not independently authenticated |
+| `inference` | Reasoned interpretation based on available evidence |
+| `hypothesis` | An assumption requiring further validation |
+| `insufficient_evidence` | Available materials cannot support a conclusion |
+
+Classification is governed by server-side rules using citation checks and model semantic review. Semantic support and directly-stated judgments remain model assessments subject to human review.
+
+### 4. Deterministic Report Assembly
+
+The model generates structured analytical outputs. TypeScript assembles the final report.
+
+This separates probabilistic reasoning from deterministic report construction.
+
+The system also incorporates:
+
+- Shared model-call budgets.
+- Request accounting and usage tracking.
+- Explicit execution approval.
+- Cancellation and failure handling.
+- Human review records.
+- Structured Markdown export.
+
+---
+
+## Product Capabilities
+
+Current product capabilities include:
+
+- Commercial project creation.
+- TXT, Markdown, and pasted-text material ingestion.
+- Source and material selection.
+- Five-stage adversarial GTM workflow.
+- Claim and citation validation.
+- Semantic support review.
+- Blue rebuttal.
+- Human review.
+- Deterministic report generation.
+- Mock and real-provider execution modes.
+
+## Current Validation Status
+
+**Release:** `v0.2.0-beta.1`
+
+The project has completed an initial engineering validation cycle.
+
+### Verified engineering evidence
+
+- 153 automated tests passed, alongside type checking and the production build.
+- The complete Mock browser workflow and an extended multi-risk UI suite passed.
+- Desktop, tablet and mobile layouts were checked.
+- Real-provider synthetic end-to-end runs are recorded separately:
+
+| Date | Provider / Model | Dispatched requests | Supplier-reported tokens | Outcome |
+|---|---|---:|---:|---|
+| 2026-11-14 | DeepSeek / `deepseek-flash` | 5 of at most 8 | 22,873 | Five phases completed, no repair attempt, deterministic report generated |
+| 2026-11-12 | DeepSeek / `deepseek-flash` | 6 of at most 8 | 38,634 | Five phases completed; one Verifier truncation repaired within budget |
+
+The latest live acceptance also checked REAL PROVIDER labeling, actual usage, independent Human Review, Markdown download and reload. Saved machine execution and the call ledger remained unchanged after review/reload.
+
+See the [v0.2 live acceptance record](docs/validation/v02-beta-live-2026-11-14.md) and the [earlier live record](docs/validation/deepseek-live-smoke-2026-11-12.md). These runs used synthetic materials, not real commercial case studies.
+
+### What this does not prove
+
+- Commercial risk identification accuracy.
+- Superiority over GPT or other general-purpose LLMs.
+- Time savings or ROI.
+- Reliability across different industries and document types.
+- Willingness to pay.
+
+The current release is a local, single-user Beta research workspace. It is available as downloadable source; a hosted multi-user SaaS is not delivered.
+
+## Workspace and Demo
+
+The product has three connected core screens:
 
 | Project Hub | Audit Workspace | Report Center |
-| --- | --- | --- |
-| ![Mock preparation](docs/screenshots/gtm-home.png) | ![Mock audit](docs/screenshots/gtm-audit.png) | ![Mock report](docs/screenshots/gtm-report.png) |
+|---|---|---|
+| ![Synthetic Project Hub](docs/screenshots/gtm-home.png) | ![Synthetic Audit Workspace](docs/screenshots/gtm-audit.png) | ![Synthetic Report Center](docs/screenshots/gtm-report.png) |
 
-The workbench shows mode, configured model, lifecycle, estimated tokens, actual usage, call count, citation checks, semantic review and classifications. Missing usage is **不可用 / unavailable**, never an estimate presented as actual usage. Stage timestamps use recorded call times; convergence has no independent start/end timestamps and shows “未提供”.
+Screenshots contain labeled synthetic records. Project statistics are derived from saved records; the separate illustrative preview is excluded from those statistics.
 
-## Architecture and stack
+Create an audit through four steps: commercial context, material ingestion, whole-source selection and budget review, then explicit confirmation. In the workspace, select a risk to inspect its Claims, original evidence, verification, rebuttal and independent review. The report has a nine-section table of contents and Markdown export. PDF export is not enabled.
 
-React 19 + Vite + TypeScript; Express API; schema-validated local JSON persistence. The existing executor owns five-stage progression; the repository owns frozen records, atomic persistence and the shared request ledger. Both Providers use that executor and the same verifiers. Convergence and Markdown are generated by TypeScript, not a model.
 
-See [architecture](docs/architecture/gtm-alpha.md), [API and provider boundaries](docs/provider-guide.md), and the retained [P1-B design](docs/architecture/gtm-redteam-p1b.md). SeminarRoom is the MIT-licensed predecessor; legacy modules and tests remain for provenance and regression coverage.
+Start with the included synthetic Mock Demo.
 
-## Install and start
+The synthetic example is intended to demonstrate the execution protocol, evidence relationships, and report structure. It is not a real commercial case study.
 
-Requirements: Node.js >=20.19 and npm. Windows is the validated desktop environment. The GTM source is on the `codex/gtm-redteam-v0.2-ui` branch; the repository name still reflects its SeminarRoom predecessor.
+A reproducible public-source case study is planned for a future release.
 
-```sh
+## Quick Start
+
+Requirements:
+
+- Node.js >=20.19
+- npm
+
+```bash
 git clone --branch codex/gtm-redteam-v0.2-ui https://github.com/chengtaoxu23-prog/seminar-room.git gtm-redteam
 cd gtm-redteam
-```
-
-Run from that repository root:
-
-```sh
 npm ci
 npm run build
 npm start
 ```
 
-Open [the local workbench](http://127.0.0.1:4317). The server binds only to loopback. Without a GTM configuration file it uses offline Mock mode. Stop the terminal process to stop the service. Port 4317 must be free; do not terminate an unrelated service to free it.
+Open [http://127.0.0.1:4317](http://127.0.0.1:4317). The server binds only to loopback; the port must be free. Without local GTM configuration, the product uses explicitly labeled offline Mock mode.
 
-For development: `npm run dev` (Vite on 5173, API on 4317).
+The repository URL retains its SeminarRoom predecessor name. Its default branch now presents GTM-RedTeam. [Download the tagged Beta](https://github.com/chengtaoxu23-prog/seminar-room/releases/tag/v0.2.0-beta.1) for the fixed release snapshot. Windows is the validated desktop environment.
 
-## Offline Mock demo
+For development, run `npm run dev` (Vite: 5173; API: 4317).
 
-Create an audit, add a clearly labelled synthetic TXT/MD or paste synthetic text, select whole sources, check the budget, then start Mock. Expand evidence, add Human Review, open the report, export Markdown and refresh. Mock uses fixed synthetic results and deliberately retains insufficient evidence / unresolved rebuttals. It cannot assess your market.
+### Real Provider Configuration
 
-**材料可以保存，不代表一次审计能全部处理。** Default storage is 300,000 Unicode characters, material estimate budget 24,576 tokens, and complete request estimate budget 49,152 tokens. Whole sources are included or excluded. Nothing is silently truncated; every model request is checked again before dispatch.
+GTM-RedTeam supports an OpenAI-compatible Chat Completions provider.
 
-## Real Provider configuration
+Copy `.env.example` to `.env.gtm.local` and edit it locally. Example real-provider configuration:
 
-Copy `.env.example` to `.env.gtm.local`, then edit that file locally. Do not paste keys into the browser, issue tracker or chat. GTM does not load the legacy `.env.local` file or reuse its OpenAI key automatically.
-
-```dotenv
+```env
 GTM_PROVIDER=openai-compatible
 GTM_BASE_URL=https://api.deepseek.com
 GTM_MODEL=deepseek-flash
-GTM_API_KEY=fill-locally
+GTM_API_KEY=<YOUR_API_KEY>
 GTM_MAX_CALLS=8
 GTM_TIMEOUT_MS=60000
 ```
 
-HTTPS is required except for a loopback HTTP endpoint. Credentials in URL/query strings are rejected. Only the server uses the key; config responses expose mode/model and limits, not credentials. `mock` is explicit offline mode; configuration and request errors in real mode never switch to Mock.
+Run `npm run check:gtm-config` to validate configuration without a model request, then restart the server. Real-provider errors do not fall back to Mock.
 
-```sh
-npm run check:gtm-config
-```
+Never commit API keys, filled local environment files, runtime data or real-business screenshots. Data is stored locally without encryption. Selected commercial context and source materials are sent to the configured supplier only when a real audit is explicitly started; supplier privacy/retention policies are outside the workspace's control.
 
-This validates configuration and constructs the adapter with **zero network calls**. Restart `npm start` to use changed settings. Before starting a real audit, the UI requires informed agreement to send the business description, market, supplementary context and selected sources to the configured supplier.
+Real-model execution requires explicit approval. Failed and retried requests consume the shared call budget.
 
-One request times out after 60 seconds by default. Per-request input estimate is capped at 49,152 tokens. Output caps for new runtime audits: Blue 4,096; Red 16,384; Red Verifier 8,192; Blue Rebuttal 12,288; rebuttal Verifier 8,192. The environment template uses eight total calls, including repairs; the omitted-variable runtime default remains five for backward compatibility, and the global maximum is ten. Before the first Blue Rebuttal request, at least four calls must remain: up to two for generation and up to two for semantic verification. A smaller remaining budget stops the audit without dispatching the rebuttal. All registered calls, including failures and pending calls, occupy the same ledger. Estimated limits are not provider-calibrated counts.
+## Engineering Checks
 
-### Approval-gated live smoke test
-
-The recorded live smoke has finished. Any additional execution requires fresh explicit authorization and local configuration:
-
-```sh
-npm run smoke -- --approve-real-smoke
-```
-
-This performs one synthetic audit with **at most eight total dispatched requests, repairs included**. Expected model stages are Blue, Red, Red Verifier, Blue Rebuttal and rebuttal Verifier; stages may be skipped when no eligible evidence exists. Convergence makes no model request. If a repair consumes the cap, the run may fail without a report; it is not silently rerun. The command reports connection/workflow/usage outcomes, not analytical quality. Records and any report stay in ignored `data/`. Running it without the approval flag sends no request. See [provider guide](docs/provider-guide.md) before approving it.
-
-## Tests
-
-```sh
+```bash
 npm test
 npm run typecheck
 npm run build
-npm run check:gtm-config
 npm run test:e2e:gtm -- ./work/browser-evidence
 npm run test:e2e:gtm:v02 -- ./work/v02-browser-evidence
 ```
 
-The browser test needs Microsoft Edge at its standard Windows location, or a Chromium executable provided through `GTM_CHROMIUM_PATH`. Unit and integration tests use offline stubs/local test servers. A real-adapter stub test is not a live-model validation. Node's test summary includes parent containers; report independent leaf tests separately. Existing legacy test commands remain available but the GTM E2E command is the current workbench acceptance path.
+Browser suites use Microsoft Edge at its standard Windows location, or a Chromium executable configured by `GTM_CHROMIUM_PATH`. They use isolated synthetic repositories and do not call a real model. Actual usage is recorded when returned; missing usage remains unavailable, never replaced by estimates.
 
-## Security and privacy
+Architecture: React, TypeScript, Vite, Express and local JSON persistence. See [UI architecture](docs/architecture/gtm-v02-ui.md), [provider guide](docs/provider-guide.md), [evaluation plan](docs/evaluation-plan.md), and [release safety](docs/release-safety.md).
 
-Local data is **not encrypted**. The repository stores business inputs, raw source snapshots, model outputs, prompt snapshots, citations, ledger and human notes under ignored `data/`. Keep that directory private. Source material and model output are not written to debug logs. A supplier receives selected inputs only after a real audit is explicitly started; its privacy/retention policies are outside this workbench's control.
+## Current Limitations
 
-Never publish `.env*`, runtime data, local logs, cache, backups, ZIP/PATCH artifacts, or real business screenshots. `.env.example` is the only allowed environment template. Review [release safety](docs/release-safety.md) and run `npm run check:release` before staging. The scanner reports locations/types, not secret values; pattern scans cannot prove absence of every sensitive item. No accounts, remote hosting or multi-user access are supported.
+- Local single-user execution.
+- No account system, hosted service or collaborative workspace.
+- Project editing/archiving, cross-project source reuse and evaluation management are not implemented.
+- No UI resume action for paused audits; preserved records do not automatically authorize a replay.
+- Primarily TXT, Markdown, and pasted-text ingestion.
+- No production-grade PDF, Excel, or web-clipping pipeline yet.
+- No controlled live external research integration.
+- No persistent, multi-round hypothesis tracking.
+- No formal GPT benchmark.
+- No independently established commercial accuracy or ROI.
 
-## Limits and roadmap
+## Roadmap
 
-Implemented: real adapter, own-material input, structured execution, deterministic citation checks/classification, evidence gaps, independent Human Review and export. Mock engineering coverage and one live synthetic workflow are verified separately. Live invalid-citation and insufficient-evidence branches remain untested; real analytical quality remains unverified. Interruptions use existing recovery behavior; no new automatic recovery is added. Earlier persisted report formats have not been migration-tested. Local data is not encrypted.
+The following version headings describe proposed product directions, not scheduled or completed releases. Real-case evaluation and analyst feedback should guide the scope of each phase.
 
-Future work, in priority order:
 
-1. Validate multiple real commercial-material cases with permission.
-2. Conduct a fair blinded comparison against a single-model GPT baseline.
-3. Measure evidence-support quality and actual human verification time.
-4. Collect real user feedback.
-5. Decide further productization from those results.
+### v0.3 — Persistent Commercial Hypothesis Tracking
 
-See the preregistered [evaluation design](docs/evaluation-plan.md). These are plans, not achieved results. Paid demand, time savings and advantage over direct GPT use remain open questions. Deployment, broader parsing and collaboration are outside this alpha.
+- Structured hypothesis registry.
+- Versioned source and evidence records.
+- PDF and spreadsheet ingestion with source locators.
+- Evidence-supported and evidence-challenged state transitions.
+- Human-approved hypothesis updates.
+- Longitudinal research history.
+
+### v0.4 — Controlled External Evidence
+
+- External source collection.
+- Retrieval timestamps and source snapshots.
+- Source provenance and quality metadata.
+- Conflicting evidence detection.
+- Evidence updates linked to existing hypotheses.
+
+### Future — Evaluation and Research Workspace
+
+- Reproducible public-source case studies.
+- Blind comparisons against general-purpose LLM baselines.
+- Multi-case evaluation datasets.
+- More advanced research workflows.
+
+### Long-term — Team Research and Delivery
+
+- Persistent research projects linking hypotheses, evidence, validation work and re-audits.
+- Team review, permissions and isolated client workspaces.
+- Reliable task recovery, backups and hosted operation.
+- Reviewable report sharing and reliable professional export formats.
+
+Roadmap items are planned capabilities, not completed features. Commercial quality, efficiency and willingness to pay require separate evidence.
+
+## Engineering Principles
+
+1. Preserve the original source.
+2. Never confuse citation existence with semantic support.
+3. Keep facts, inferences, and hypotheses distinguishable.
+4. Never manufacture missing evidence.
+5. Keep model reasoning separate from deterministic validation.
+6. Preserve human review and audit history.
+7. Make execution budgets and limitations visible.
 
 ## License
 
-[MIT](LICENSE). Retains SeminarRoom contributors' copyright and provenance. Dependencies retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.md).
+MIT License.
 
-## 中文简介
+See [LICENSE](LICENSE) for details. The project retains the MIT-licensed SeminarRoom predecessor copyright and provenance. Dependencies retain their own licenses; see [third-party notices](THIRD_PARTY_NOTICES.md).
 
-GTM-RedTeam 是面向出海咨询分析师的证据型 GTM 审计工作台。它用固定五阶段、原文核验、独立语义审查、服务端分类和人工复核，让商业质询能够回到材料，或明确标注证据不足。当前为本地单用户 Beta；Mock 已完成工程验证，DeepSeek 已用一个合成案例完成真实端到端冒烟（六请求、实际 38,634 Token），但真实商业质量、GPT 对比、多案例评测与付费意愿尚未验证。
+---
+
+**GTM-RedTeam is an ongoing engineering and product research project.**
+
+Its central question is simple:
+
+*How can we make AI-generated commercial reasoning easier to challenge, verify, and trust?*
