@@ -1,12 +1,12 @@
-# GTM-RedTeam v0.1.0-alpha
+# GTM-RedTeam v0.2.0-beta.1
 
 **GTM-RedTeam — Evidence-backed Adversarial GTM Risk Audit**
 
 An evidence-backed adversarial workflow for identifying unsupported assumptions, challenging GTM strategies, and producing traceable commercial risk assessments.
 
-> **Validation status:** Mock engineering tests passed. On 2026-11-12, DeepSeek `deepseek-flash` completed one synthetic five-interview end-to-end smoke: **six real requests, all five business phases, a deterministic Markdown report, and 38,634 actual tokens recorded**. One Verifier truncation was repaired within the eight-call budget. This does not validate real commercial quality. See the [live validation record](docs/validation/deepseek-live-smoke-2026-11-12.md) and the separately preserved [first failed run](docs/deepseek-smoke-2026-11-12.md).
+> **Validation status:** 153 automated tests and two isolated Mock browser suites passed. On 2026-11-14, DeepSeek `deepseek-flash` completed a new synthetic audit in **five real requests / 22,873 actual tokens**, followed by successful UI review, report export and reload checks. See the [v0.2 live acceptance record](docs/validation/v02-beta-live-2026-11-14.md). This verifies the workflow, not real commercial quality. The [earlier live validation](docs/validation/deepseek-live-smoke-2026-11-12.md) is retained separately.
 
-> **Alpha limits:** Local single-user only. TXT, MD and pasted text; no PDF/DOCX import, web research or RAG. No GPT baseline comparison, multi-case Benchmark, real-customer validation or paid-demand evidence. Token estimates are not supplier-calibrated.
+> **Beta limits:** Local single-user only. TXT, MD and pasted text; no PDF/DOCX import, web research or RAG. No GPT baseline comparison, multi-case Benchmark, real-customer validation or paid-demand evidence. Token estimates are not supplier-calibrated.
 
 **The model proposes. The verifier checks. The server decides. The human reviews.**
 
@@ -49,11 +49,17 @@ The rebuttal verifier is an internal part of stage four, not a sixth business ph
 | Human Review | Separate analyst decisions and notes alongside immutable machine findings |
 | Deterministic Report Generation | TypeScript assembles the final report from validated records; model prose cannot replace it |
 
+## v0.2 workspace
+
+Project Hub now manages actual audit records rather than opening a large form. A four-step setup leads into a split-pane Audit Workspace with selectable risks, source evidence, Blue rebuttals and separate Human Review. Report Center renders a structured nine-section deliverable with Markdown export.
+
+Desktop, tablet and mobile layouts have been checked. PDF import/export, project editing/archiving and evaluation management remain Planned. See [UI architecture and boundaries](docs/architecture/gtm-v02-ui.md).
+
 ## Three screens
 
 These screenshots show **synthetic Mock material and output**, not real commercial audit results.
 
-| Prepare sources and budget | Inspect evidence and review | Read and export |
+| Project Hub | Audit Workspace | Report Center |
 | --- | --- | --- |
 | ![Mock preparation](docs/screenshots/gtm-home.png) | ![Mock audit](docs/screenshots/gtm-audit.png) | ![Mock report](docs/screenshots/gtm-report.png) |
 
@@ -67,10 +73,10 @@ See [architecture](docs/architecture/gtm-alpha.md), [API and provider boundaries
 
 ## Install and start
 
-Requirements: Node.js >=20.19 and npm. Windows is the validated desktop environment. The GTM source is on the `codex/gtm-redteam-v0.1` branch; the repository name still reflects its SeminarRoom predecessor.
+Requirements: Node.js >=20.19 and npm. Windows is the validated desktop environment. The GTM source is on the `codex/gtm-redteam-v0.2-ui` branch; the repository name still reflects its SeminarRoom predecessor.
 
 ```sh
-git clone --branch codex/gtm-redteam-v0.1 https://github.com/chengtaoxu23-prog/seminar-room.git gtm-redteam
+git clone --branch codex/gtm-redteam-v0.2-ui https://github.com/chengtaoxu23-prog/seminar-room.git gtm-redteam
 cd gtm-redteam
 ```
 
@@ -133,6 +139,7 @@ npm run typecheck
 npm run build
 npm run check:gtm-config
 npm run test:e2e:gtm -- ./work/browser-evidence
+npm run test:e2e:gtm:v02 -- ./work/v02-browser-evidence
 ```
 
 The browser test needs Microsoft Edge at its standard Windows location, or a Chromium executable provided through `GTM_CHROMIUM_PATH`. Unit and integration tests use offline stubs/local test servers. A real-adapter stub test is not a live-model validation. Node's test summary includes parent containers; report independent leaf tests separately. Existing legacy test commands remain available but the GTM E2E command is the current workbench acceptance path.
@@ -163,4 +170,4 @@ See the preregistered [evaluation design](docs/evaluation-plan.md). These are pl
 
 ## 中文简介
 
-GTM-RedTeam 是面向出海咨询分析师的证据型 GTM 审计工作台。它用固定五阶段、原文核验、独立语义审查、服务端分类和人工复核，让商业质询能够回到材料，或明确标注证据不足。当前为本地单用户 Alpha；Mock 已完成工程验证，DeepSeek 已用一个合成案例完成真实端到端冒烟（六请求、实际 38,634 Token），但真实商业质量、GPT 对比、多案例评测与付费意愿尚未验证。
+GTM-RedTeam 是面向出海咨询分析师的证据型 GTM 审计工作台。它用固定五阶段、原文核验、独立语义审查、服务端分类和人工复核，让商业质询能够回到材料，或明确标注证据不足。当前为本地单用户 Beta；Mock 已完成工程验证，DeepSeek 已用一个合成案例完成真实端到端冒烟（六请求、实际 38,634 Token），但真实商业质量、GPT 对比、多案例评测与付费意愿尚未验证。

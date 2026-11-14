@@ -26,7 +26,11 @@ export function createGtmApp(repository=new AuditRepository(),configuration:GtmC
  const empty=(req:Request)=>assertJsonSchema(objectSchema({}),req.body??{});
  app.use('/api/gtm',(req,_res,next)=>{try{if(Object.keys(req.query).some(k=>!(req.path.endsWith('/report')&&k==='format')))throw new ApiFailure(400,'invalid_query','不支持此查询参数。');next();}catch(e){next(e);}});
  app.get('/api/gtm/config',route(async(_req,res)=>{res.json({mode:identity.mode==='mock'?'MOCK DEMO':'REAL PROVIDER',provider:identity,config:configuration});}));
- app.get('/api/gtm/audits',route(async(_req,res)=>{const records=await Promise.all((await repository.ids()).map(async id=>{const a=await load(id);return {id,name:a.context.projectName??a.context.businessBrief.slice(0,40),state:a.state,updatedAt:a.updatedAt,hasReport:!!a.execution?.report};}));res.json(records.sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)));}));
+ // Read-only workspace summaries, derived from persisted records (no material bodies).
+ app.get('/api/gtm/audits',route(async(_req,res)=>{const records=await Promise.all((await repository.ids()).map(async id=>{
+  const a=await load(id),findings=a.execution?.findings??[],reviewed=new Set((a.humanReviews??[]).map(r=>r.challengeId));
+  return {id,name:a.context.projectName??a.context.businessBrief.slice(0,40),state:a.state,createdAt:a.createdAt,updatedAt:a.updatedAt,hasReport:!!a.execution?.report,targetMarket:a.context.targetMarket??null,provider:identityFor(a),sourceCount:a.sources.length,riskCount:findings.length,pendingReviewCount:findings.filter(f=>!reviewed.has(f.challenge.id)).length};
+ }));res.json(records.sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)));}));
  app.post('/api/gtm/audits',route(async(req,res)=>{const draft=createAuditDraft(req.body,[],[],configuration);draft.providerSnapshot=structuredClone(identity);const a=await repository.save(draft,null);res.status(201).json(await view(a.id));}));
  app.get('/api/gtm/audits/:id',route(async(req,res)=>{res.json(await view(req.params.id));}));
  app.post('/api/gtm/audits/:id/materials',route(async(req,res)=>{

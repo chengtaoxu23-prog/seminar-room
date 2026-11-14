@@ -22,12 +22,16 @@ test('P2 complete Mock API path, report export and reload preserve evidence and 
  const id=await f.create();const added=await f.material(id);assert.equal(added.status,201);const s=added.data.audit.sources[0];
  let r=await f.api(`/audits/${id}/selection`,'PUT',{selectedSourceIds:[s.id]});assert.equal(r.status,200);assert.ok(r.data.firstRequestEstimate>0);assert.ok(r.data.audit.selection.estimatedMaterialTokens>0);
  r=await f.api(`/audits/${id}/start`,'POST',{});assert.equal(r.status,202);const a=await f.finished(id);assert.equal(a.state.lifecycle,'completed',JSON.stringify(a.execution?.lastError));assert.equal(a.ledger.calls.length,4);assert.equal(a.ledger.usage.availability,'unavailable');assert.equal(a.execution!.findings![0].claims[0].classification,'insufficient_evidence');assert.equal(a.execution!.rebuttals![0].rebuttal.response,'unresolved');assert.deepEqual(a.execution!.rebuttals![0].claims,[]);
+ const summary=(await f.api('/audits')).data[0];
+ assert.equal(summary.sourceCount,1);assert.equal(summary.riskCount,1);assert.equal(summary.pendingReviewCount,1);
+ assert.deepEqual(summary.provider,{mode:'mock',model:'MOCK-synthetic-only'});assert.equal(summary.targetMarket,null);
+ assert.equal(summary.createdAt,a.createdAt);assert.equal('sources' in summary,false);assert.equal('execution' in summary,false);
  const immutable=structuredClone(a.execution),riskId=a.execution!.findings![0].challenge.id;
  r=await f.api(`/audits/${id}/reviews/${riskId}`,'PUT',{decision:'further_research',note:'需要独立证据'});assert.equal(r.status,200);assert.deepEqual(r.data.audit.execution,immutable);assert.equal(r.data.audit.humanReviews[0].note,'需要独立证据');
  r=await f.api(`/audits/${id}/report`);assert.equal(r.status,200);assert.match(r.data.markdown,/通过证据核验的质询/);assert.match(r.data.markdown,/不代表商业风险已被客观证实/);assert.match(r.data.markdown,/需要独立证据/);assert.match(r.data.markdown,/实际 usage：不可用/);assert.match(r.data.markdown,/未提供/);
  const exported=await f.api(`/audits/${id}/report?format=md`);assert.equal(exported.status,200);assert.match(exported.headers.get('content-disposition')!,/\.md/);assert.equal(exported.data,r.data.markdown);
  const reloaded=createGtmApp(new AuditRepository(f.repository.dir));await reloaded.init();const restored=await reloaded.view(id);assert.equal(restored.audit.humanReviews![0].note,'需要独立证据');assert.deepEqual(restored.audit.execution,immutable);assert.deepEqual(restored.audit.sources,a.sources);
- const list=await f.api('/audits');assert.equal(list.data[0].hasReport,true);assert.equal(list.data[0].id,id);assert.equal((await f.api('/audits/'+id)).data.audit.ledger.calls.length,4);
+ const list=await f.api('/audits');assert.equal(list.data[0].hasReport,true);assert.equal(list.data[0].id,id);assert.equal(list.data[0].pendingReviewCount,0);assert.equal((await f.api('/audits/'+id)).data.audit.ledger.calls.length,4);
  }finally{await f.close();}
 });
 test('P2 config rejects unknown query',async()=>{const f=await setup();try{assert.equal((await f.api('/config?key=secret')).status,400);assert.equal((await f.api('/config')).data.mode,'MOCK DEMO');}finally{await f.close();}});

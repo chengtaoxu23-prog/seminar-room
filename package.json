@@ -1,6 +1,6 @@
 {
   "name": "gtm-redteam",
-  "version": "0.1.0-alpha",
+  "version": "0.2.0-beta.1",
   "private": true,
   "type": "module",
   "description": "Evidence-backed Adversarial GTM Audit Workbench",
@@ -20,6 +20,7 @@
     "start:gtm": "tsx server/gtm-server.ts",
     "check:gtm-config": "tsx scripts/gtm-check-config.ts",
     "test:e2e:gtm": "tsx scripts/gtm-p2-e2e.ts",
+    "test:e2e:gtm:v02": "tsx scripts/gtm-v02-e2e.ts",
     "smoke:gtm-real": "tsx scripts/gtm-real-smoke.ts",
     "check:release": "tsx scripts/release-safety.ts",
     "smoke": "tsx scripts/gtm-real-smoke.ts"
